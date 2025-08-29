@@ -1,333 +1,258 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>手書き数字認識（スマホ対応デモ）</title>
-  <style>
-    :root {
-      --bg: #0b0b0e;
-      --fg: #e7e7ea;
-      --muted: #a3a3ad;
-      --card: #15161a;
-      --border: #272833;
-      --accent: #6ea8fe;
-      --danger: #ff6b6b;
-      --ok: #7bd88f;
-    }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #f7f7fb; --fg: #101014; --muted: #474753; --card: #ffffff; --border: #e6e6ef; --accent: #2458e6; --danger: #d34040; --ok: #0a8f4d;
-      }
-    }
-    html, body { height: 100%; }
-    body {
-      margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, "ヒラギノ角ゴ ProN", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
-    }
-    .wrap {
-      min-height: 100%;
-      padding: 16px env(safe-area-inset-right) calc(16px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
-      display: grid;
-      place-items: start center;
-    }
-    .container {
-      width: min(900px, 100%);
-      display: grid;
-      gap: 16px;
-      grid-template-columns: 1fr;
-    }
-    @media (min-width: 820px) {
-      .container { grid-template-columns: 1.1fr 0.9fr; align-items: start; }
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      box-shadow: 0 6px 24px rgba(0,0,0,.2);
-      overflow: clip;
-    }
-    .card h2 { margin: 0; font-size: 18px; }
-    .card .hd { display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 12px 14px; border-bottom:1px solid var(--border); }
-    .card .bd { padding: 14px; }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Hand written recognition — Mobile Ready</title>
+<style>
+  :root {
+    --gap: 12px;
+    --pad: 12px;
+  }
+  html, body { height: 100%; }
+  body {
+    background: #f7f7f7;
+    margin: 0;
+    padding: var(--pad);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+    color: #222;
+  }
 
-    /* 描画エリア */
-    .canvas-wrap { width: 100%; }
-    canvas { width: 100%; height: auto; display: block; touch-action: none; background: #111; border-radius: 12px; border: 1px dashed var(--border); }
-    .tools { display:flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
-    .tools .row { display:flex; gap:10px; align-items:center; }
-    button, .btn {
-      appearance: none; border: 1px solid var(--border); background: transparent; color: var(--fg);
-      padding: 10px 14px; border-radius: 999px; font-weight: 600; cursor: pointer;
-    }
-    button:active { transform: translateY(1px); }
-    .btn-primary { background: var(--accent); color: white; border-color: transparent; }
-    .btn-danger { background: var(--danger); color: white; border-color: transparent; }
-    .btn-ok { background: var(--ok); color: #021; border-color: transparent; }
-    label { color: var(--muted); font-size: 14px; }
-    input[type="range"] { width: 160px; }
+  /* Toolbar */
+  .toolbar-table { width: 100%; border-collapse: collapse; margin-bottom: var(--gap); }
+  .toolbar-table td { padding: 8px; background: #eee; }
+  #toolbar { background: #e0e0e0; }
 
-    .hint { color: var(--muted); font-size: 14px; }
+  /* Canvas + side panes */
+  .layout { display: grid; grid-template-columns: 1fr; gap: var(--gap); align-items: start; }
 
-    .preview-area { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
-    .preview {
-      display:grid; gap:8px; align-content:start;
-    }
-    .preview canvas { background: #fff; border-radius: 8px; border:1px solid var(--border); }
-    .meta { font-size: 13px; color: var(--muted); }
+  canvas {
+    background: #fff;
+    border: 1px solid #aaa;
+    border-radius: 8px;
+    width: min(92vw, 360px);   /* responsive display size */
+    height: auto;               /* keep aspect ratio */
+    touch-action: none;         /* prevent scroll while drawing */
+  }
 
-    .footer { text-align:center; color: var(--muted); font-size: 12px; padding: 8px; }
-    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; padding:2px 6px; border:1px solid var(--border); border-radius:6px; }
-  </style>
+  #predicted{
+    background-color: #fff;
+    border: solid 1px #ccc;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    width: min(32vw, 160px);
+    height: min(32vw, 160px);
+    font-size: min(18vw, 72px);
+    margin: 6px 0;
+  }
+  #hypothesis { min-height: 24px; }
+
+  /* Buttons & inputs = larger tap targets */
+  input[type="button"], input[type="range"], select, input[type="color"], #learning_rate, #epoch {
+    font-size: 16px; /* avoid iOS zoom */
+  }
+  input[type="button"], #predict, #clear_canvas, #train_btn, #add_btn, #init_weights, #clear_batch {
+    padding: 10px 14px; border-radius: 8px; border: 1px solid #bbb; background: #fff; min-height: 44px;
+  }
+
+  /* Tables that JS depends on keep their IDs, but we make them scrollable on small screens */
+  #label, #graph, #radio, #indicator { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 6px; }
+  #graph .bar_graph { background-color: #00cc00; height: 12px; border-radius: 6px; }
+
+  /* Compact table look */
+  table { border-collapse: collapse; }
+  td.cell { text-align: center; padding: 4px 6px; }
+
+  /* Mobile layout */
+  @media (max-width: 720px) {
+    .toolbar-table td { display: block; width: 100%; }
+    .buttons-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* Focus on key UI for phones */
+    #label { display: none; }
+    /* #radio and #indicator default hidden already; keep hidden on phones. */
+
+    /* Make slider full width */
+    #learning_rate_range { width: 100%; max-width: 420px; }
+  }
+
+  /* Desktop tweaks */
+  @media (min-width: 721px) {
+    .layout { grid-template-columns: auto auto auto auto auto; }
+    canvas { width: 280px; }
+    #predicted { width: 120px; height: 120px; font-size: 80px; }
+  }
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="container">
-      <section class="card">
-        <div class="hd">
-          <h2>① キャンバスに数字を描く</h2>
-          <div class="hint">指・ペン・マウス対応 / ピンチ操作不要</div>
-        </div>
-        <div class="bd">
-          <div class="canvas-wrap">
-            <canvas id="draw" aria-label="手書き入力キャンバス" role="img"></canvas>
-          </div>
-          <div class="tools">
-            <div class="row">
-              <button id="undoBtn" class="btn">元に戻す</button>
-              <button id="clearBtn" class="btn btn-danger">全消去</button>
-              <button id="invertBtn" class="btn">白黒反転</button>
-            </div>
-            <div class="row">
-              <label for="thick">線の太さ</label>
-              <input id="thick" type="range" min="4" max="36" value="16" />
-              <span id="thickVal" class="meta">16px</span>
-            </div>
-            <div class="row">
-              <button id="saveBtn" class="btn">PNG保存</button>
-              <button id="predictBtn" class="btn btn-primary">推論（ダミー）</button>
-            </div>
-          </div>
-          <p class="hint" style="margin-top:10px">
-            スクロール誤動作を防ぐためキャンバス上のジェスチャーは無効化しています。ページ移動はキャンバス外をスワイプしてください。
-          </p>
-        </div>
-      </section>
 
-      <section class="card">
-        <div class="hd">
-          <h2>② 前処理 & プレビュー</h2>
-          <div class="hint">28×28 グレースケールに縮小／モデル入力を確認</div>
-        </div>
-        <div class="bd">
-          <div class="preview-area">
-            <div class="preview">
-              <strong>28×28（x8表示）</strong>
-              <canvas id="mini" width="224" height="224"></canvas>
-              <div class="meta" id="stats">ピクセル統計: -</div>
-            </div>
-            <div class="preview">
-              <strong>入力ベクトル</strong>
-              <div id="vector" class="meta" style="max-height:220px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px; background: rgba(0,0,0,0.1)"></div>
-              <div class="hint">※ 値は0〜1に正規化（白=0, 黒=1）。必要に応じて反転可。</div>
-            </div>
-          </div>
-        </div>
-      </section>
+<table class="toolbar-table">
+  <tr id="toolbar">
+    <td>
+      <label for="predict_type" style="display:block;font-size:14px;margin-bottom:4px;">種別</label>
+      <select id="predict_type">
+        <option value="0">数字</option>
+        <option value="1">アルファベット</option>
+        <option value="2">かな</option>
+        <option value="3">記号</option>
+      </select>
+    </td>
+    <td>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <label for="learning_rate" style="white-space:nowrap;">学習率</label>
+        <input id="learning_rate" value="0.1" inputmode="decimal" />
+        <input type="range" id="learning_rate_range" min="0" max="5" />
+      </div>
+    </td>
+    <td>
+      <label for="epoch" style="white-space:nowrap;">エポック</label>
+      <input id="epoch" value="1" inputmode="numeric" />
+    </td>
+    <td class="tab">
+      <label for="tab_softmax">ソフトマックス</label>
+      <input type="radio" name="tab" id="tab_softmax" value="softmax" checked />
+    </td>
+    <td class="tab">
+      <label for="tab_batch_size">バッチサイズ</label>
+      <input type="radio" name="tab" id="tab_batch_size" value="batch_size" />
+    </td>
+  </tr>
+</table>
 
-      <div class="footer">© 2025 Handwritten Demo — スマホ最適化: メタビューポート / DPIスケーリング / Pointer Events / 安全域（ノッチ）対応</div>
+<form name="form1">
+  <div class="layout">
+    <!-- Column 1: Canvas -->
+    <div>
+      <canvas id="canvas" width="280" height="280"></canvas>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input type="color" id="color" value="#77cc77" aria-label="ペン色" />
+        <input type="button" id="predict" value="Predict" />
+        <input type="button" id="clear_canvas" value=" Clear " />
+      </div>
+
+      <div class="buttons-row" style="margin-top:6px;">
+        <input type="button" id="init_weights" value=" Init " />
+        <input type="button" id="clear_batch" value="Clr Bat" />
+        <input type="button" id="add_btn" value="  Add  " />
+        <input type="button" id="train_btn" value=" Train " />
+      </div>
     </div>
+
+    <!-- Column 2: Labels (hidden on small screens but kept for JS) -->
+    <table id="label">
+      <tr><td class="cell cellnum0">0</td></tr>
+      <tr><td class="cell cellnum1">1</td></tr>
+      <tr><td class="cell cellnum2">2</td></tr>
+      <tr><td class="cell cellnum3">3</td></tr>
+      <tr><td class="cell cellnum4">4</td></tr>
+      <tr><td class="cell cellnum5">5</td></tr>
+      <tr><td class="cell cellnum6">6</td></tr>
+      <tr><td class="cell cellnum7">7</td></tr>
+      <tr><td class="cell cellnum8">8</td></tr>
+      <tr><td class="cell cellnum9">9</td></tr>
+    </table>
+
+    <!-- Column 3: Graph (default visible) -->
+    <table id="graph">
+      <tr><td class="graph n0"></td></tr>
+      <tr><td class="graph n1"></td></tr>
+      <tr><td class="graph n2"></td></tr>
+      <tr><td class="graph n3"></td></tr>
+      <tr><td class="graph n4"></td></tr>
+      <tr><td class="graph n5"></td></tr>
+      <tr><td class="graph n6"></td></tr>
+      <tr><td class="graph n7"></td></tr>
+      <tr><td class="graph n8"></td></tr>
+      <tr><td class="graph n9"></td></tr>
+    </table>
+
+    <!-- Column 4: Radio (kept for JS; hidden by default) -->
+    <table id="radio" style="display:none;">
+      <tr><td><input type="radio" name="num" value="0" /></td></tr>
+      <tr><td><input type="radio" name="num" value="1" /></td></tr>
+      <tr><td><input type="radio" name="num" value="2" /></td></tr>
+      <tr><td><input type="radio" name="num" value="3" /></td></tr>
+      <tr><td><input type="radio" name="num" value="4" /></td></tr>
+      <tr><td><input type="radio" name="num" value="5" /></td></tr>
+      <tr><td><input type="radio" name="num" value="6" /></td></tr>
+      <tr><td><input type="radio" name="num" value="7" /></td></tr>
+      <tr><td><input type="radio" name="num" value="8" /></td></tr>
+      <tr><td><input type="radio" name="num" value="9" /></td></tr>
+    </table>
+
+    <!-- Column 5: Indicator (kept for JS; hidden by default) -->
+    <table id="indicator" style="display:none;">
+      <tr><td class="indicator n0">&nbsp;</td></tr>
+      <tr><td class="indicator n1">&nbsp;</td></tr>
+      <tr><td class="indicator n2">&nbsp;</td></tr>
+      <tr><td class="indicator n3">&nbsp;</td></tr>
+      <tr><td class="indicator n4">&nbsp;</td></tr>
+      <tr><td class="indicator n5">&nbsp;</td></tr>
+      <tr><td class="indicator n6">&nbsp;</td></tr>
+      <tr><td class="indicator n7">&nbsp;</td></tr>
+      <tr><td class="indicator n8">&nbsp;</td></tr>
+      <tr><td class="indicator n9">&nbsp;</td></tr>
+    </table>
   </div>
 
+  <div style="margin-top:8px; display:grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px;">
+    <span>Predict:</span>
+    <div id="predicted"></div>
+    <span>H:</span>
+    <span id="hypothesis"> </span>
+  </div>
+  <span id="hypothesis_all" style="display:none"></span><br />
+  loss:<span id="loss"></span><br />
+</form>
+
+<!-- Scripts -->
+<script src="canvas.js"></script>
+<script src="jquery.js"></script>
+<script src="data/cW1.js"></script>
+<script src="data/cW2.js"></script>
+<script src="data/cb1.js"></script>
+<script src="data/cb2.js"></script>
+<script src="data/W1.js"></script>
+<script src="data/b1.js"></script>
+<script src="data/W2.js"></script>
+<script src="data/b2.js"></script>
+<script src="network.js"></script>
+<script src="main.js"></script>
+
 <script>
-(() => {
-  const canvas = document.getElementById('draw');
-  const ctx = canvas.getContext('2d');
-  const mini = document.getElementById('mini');
-  const miniCtx = mini.getContext('2d');
+  // ===== Mobile drawing support (adds touch events; keeps existing JS intact) =====
+  (function(){
+    if (!window.canvas) return; // canvas.js defines global `canvas` & `ctx`
 
-  const thick = document.getElementById('thick');
-  const thickVal = document.getElementById('thickVal');
-  const undoBtn = document.getElementById('undoBtn');
-  const clearBtn = document.getElementById('clearBtn');
-  const invertBtn = document.getElementById('invertBtn');
-  const saveBtn = document.getElementById('saveBtn');
-  const predictBtn = document.getElementById('predictBtn');
-  const vectorEl = document.getElementById('vector');
-  const statsEl = document.getElementById('stats');
+    const toMouseLikeEvent = (e) => {
+      const t = e.touches && e.touches[0] ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
+      return { clientX: t.clientX, clientY: t.clientY, target: canvas };
+    };
 
-  let drawing = false;
-  let last = null;
-  let penColor = '#fff'; // 白地に黒 or 黒地に白を切替可（反転時に入替）
-  let bgColor = '#000';
-  let strokes = []; // ベクターベースで保持（再描画/リサイズ可）
-  let activeStroke = null;
+    // Start drawing
+    canvas.addEventListener('touchstart', function(e){
+      e.preventDefault();
+      window.drawing = true; // uses global from canvas.js
+      const p = toMouseLikeEvent(e);
+      const rect = p.target.getBoundingClientRect();
+      window.before_x = p.clientX - rect.left;
+      window.before_y = p.clientY - rect.top;
+    }, { passive: false });
 
-  function setSize() {
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const rect = canvas.getBoundingClientRect();
-    // 正方形に保つ（横幅に合わせる）
-    const cssSize = Math.round(rect.width);
-    canvas.style.height = cssSize + 'px';
-    canvas.width  = Math.round(cssSize * dpr);
-    canvas.height = Math.round(cssSize * dpr);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-    redraw();
-    updateMiniAndVector();
-  }
+    // Draw while moving
+    canvas.addEventListener('touchmove', function(e){
+      e.preventDefault();
+      if (!window.drawing) return;
+      const p = toMouseLikeEvent(e);
+      if (typeof draw_canvas === 'function') draw_canvas(p);
+    }, { passive: false });
 
-  function redraw() {
-    const rect = canvas.getBoundingClientRect();
-    const w = rect.width, h = rect.width; // 正方形
-    // 背景塗り
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, w, h);
-
-    // 既存ストローク描画（正規化座標→実座標）
-    for (const s of strokes) {
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = s.thickness * (w); // thicknessはキャンバス幅に対する比率
-      ctx.beginPath();
-      for (let i = 0; i < s.points.length; i++) {
-        const p = s.points[i];
-        const x = p.x * w, y = p.y * h;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-  }
-
-  function startStroke(x, y) {
-    const rect = canvas.getBoundingClientRect();
-    const w = rect.width, h = rect.width;
-    const t = (parseInt(thick.value, 10) / 100); // 100に対する比率
-    activeStroke = { color: penColor, thickness: t, points: [] };
-    activeStroke.points.push({ x: x / w, y: y / h });
-    strokes.push(activeStroke);
-    last = { x, y };
-  }
-
-  function extendStroke(x, y) {
-    if (!activeStroke) return;
-    const rect = canvas.getBoundingClientRect();
-    const w = rect.width, h = rect.width;
-    activeStroke.points.push({ x: x / w, y: y / h });
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = activeStroke.color;
-    ctx.lineWidth = activeStroke.thickness * (w);
-    ctx.beginPath();
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    last = { x, y };
-  }
-
-  function endStroke() {
-    activeStroke = null; last = null; updateMiniAndVector();
-  }
-
-  function pointerPos(e) {
-    const r = canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  }
-
-  // Pointer Events
-  canvas.addEventListener('pointerdown', (e) => {
-    e.preventDefault(); canvas.setPointerCapture(e.pointerId);
-    drawing = true; const p = pointerPos(e); startStroke(p.x, p.y);
-  }, { passive: false });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!drawing) return; e.preventDefault(); const p = pointerPos(e); extendStroke(p.x, p.y);
-  }, { passive: false });
-  const endAny = (e) => { if (!drawing) return; drawing = false; canvas.releasePointerCapture?.(e.pointerId); endStroke(); };
-  canvas.addEventListener('pointerup', endAny, { passive: false });
-  canvas.addEventListener('pointercancel', endAny, { passive: false });
-  canvas.addEventListener('pointerleave', endAny, { passive: false });
-
-  // UI: 太さ
-  const updateThickLabel = () => { thickVal.textContent = parseInt(thick.value, 10) + 'px'; };
-  thick.addEventListener('input', updateThickLabel);
-  updateThickLabel();
-
-  // 操作ボタン
-  undoBtn.addEventListener('click', () => { strokes.pop(); redraw(); updateMiniAndVector(); });
-  clearBtn.addEventListener('click', () => { strokes = []; redraw(); updateMiniAndVector(); });
-  invertBtn.addEventListener('click', () => {
-    // 背景とペン色を入替（白地/黒字 <-> 黒地/白字）
-    const prevBg = bgColor; bgColor = penColor === '#fff' ? '#000' : '#fff';
-    penColor = prevBg;
-    redraw(); updateMiniAndVector();
-  });
-
-  saveBtn.addEventListener('click', () => {
-    const a = document.createElement('a');
-    a.download = 'handwritten.png';
-    a.href = canvas.toDataURL('image/png');
-    a.click();
-  });
-
-  predictBtn.addEventListener('click', () => {
-    // 実運用ではここでモデル推論（tfjs/onnxruntime-webなど）を呼び出す
-    const arr = to28x28Vector();
-    alert('ダミー推論: ベクトル長 ' + arr.length + '（実装を差し替えてください）');
-  });
-
-  // 28x28への変換 & プレビュー
-  function to28x28Vector() {
-    // キャンバス内容を28x28に縮小して0〜1に正規化
-    const tmp = document.createElement('canvas');
-    tmp.width = 28; tmp.height = 28;
-    const tctx = tmp.getContext('2d');
-    tctx.imageSmoothingEnabled = true;
-    tctx.imageSmoothingQuality = 'high';
-    // 現キャンバスを描画（CSSピクセル基準でOK）
-    const rect = canvas.getBoundingClientRect();
-    const snapshot = document.createElement('canvas');
-    snapshot.width = rect.width; snapshot.height = rect.width;
-    const sctx = snapshot.getContext('2d');
-    sctx.drawImage(canvas, 0, 0, rect.width, rect.width);
-    tctx.drawImage(snapshot, 0, 0, 28, 28);
-
-    const { data } = tctx.getImageData(0, 0, 28, 28);
-    const v = new Float32Array(28 * 28);
-    let sum = 0, min = 1, max = 0;
-    const bgWhite = (bgColor === '#fff');
-    for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-      // 単純な輝度 Y = 0.299R + 0.587G + 0.114B（0〜255）
-      const r = data[i], g = data[i + 1], b = data[i + 2];
-      const y = 0.299 * r + 0.587 * g + 0.114 * b; // 0..255
-      let val = bgWhite ? (1 - y / 255) : (y / 255); // 白地→黒=1, 黒地→白=1
-      v[j] = val;
-      sum += val; if (val < min) min = val; if (val > max) max = val;
-    }
-    // プレビューへ反映
-    miniCtx.imageSmoothingEnabled = false;
-    // 拡大表示用に一旦28×28へ塗ってから224×224へ描画
-    const imgData = tctx.getImageData(0,0,28,28);
-    const scale = 8;
-    const up = document.createElement('canvas'); up.width = 28; up.height = 28;
-    up.getContext('2d').putImageData(imgData, 0, 0);
-    miniCtx.clearRect(0,0,mini.width, mini.height);
-    miniCtx.drawImage(up, 0,0, 28,28, 0,0, 28*scale, 28*scale);
-
-    statsEl.textContent = `ピクセル統計: min=${min.toFixed(3)}  max=${max.toFixed(3)}  mean=${(sum/784).toFixed(3)}`;
-    vectorEl.textContent = Array.from(v).map(x => x.toFixed(2)).join(', ');
-    return v;
-  }
-
-  function updateMiniAndVector(){ to28x28Vector(); }
-
-  // 初期セットアップ
-  const ro = new ResizeObserver(() => setSize());
-  ro.observe(canvas);
-  window.addEventListener('orientationchange', setSize);
-  setTimeout(setSize, 0);
-})();
+    // End drawing
+    canvas.addEventListener('touchend', function(e){
+      e.preventDefault();
+      window.drawing = false;
+    }, { passive: false });
+  })();
 </script>
 </body>
 </html>
