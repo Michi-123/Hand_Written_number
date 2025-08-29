@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>Handwritten Recognition — Mobile Tabs</title>
+  <title>Handwritten Recognition — V1</title>
   <style>
     :root{
       --bg:#0b0b0c;
@@ -24,11 +24,11 @@
     .container{
       max-width: 1080px;
       margin: 0 auto;
-      padding: 12px 12px 80px;
+      padding: 0 12px 80px;
     }
     header{
       display:flex;align-items:center;justify-content:space-between;
-      gap:12px;margin-bottom:12px;
+      gap:12px;margin:10px 0 12px;
     }
     header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
     .toolbar{
@@ -52,12 +52,12 @@
     /* Canvas area */
     .canvas-card{
       background: var(--card); border:1px solid var(--border);
-      border-radius: 14px; padding: 12px;
+      border-radius: 14px; padding: 12px; margin-top:8px;
     }
     #canvas{
       display:block;margin:0 auto; background:#fff; border:1px solid #aaa;
       width:100%; max-width: 360px; height:auto; aspect-ratio:1/1;
-      touch-action: none; -ms-touch-action: none; user-select: none; -webkit-user-select: none;
+      touch-action:none; user-select:none; -webkit-user-select:none;
     }
     #predicted{
       background:#fff;color:#111;width:120px;height:120px;
@@ -66,19 +66,25 @@
     }
 
     /* Top-level tabs (three panels) */
-    .mtabs{margin-top:12px}
+    .mtabs{margin:0}
     .mtabs input[type=radio]{display:none}
+    .mtab-wrap{
+      position: sticky; top: 0; z-index: 50;
+      padding: max(6px, env(safe-area-inset-top)) 0 8px;
+      background: linear-gradient(180deg, rgba(11,11,12,.98), rgba(11,11,12,.92));
+      backdrop-filter: blur(8px);
+    }
     .mtab-bar{
       display:grid;grid-template-columns: 1fr 1fr 1fr; gap:8px;
-      margin-bottom:10px;
+      margin:0 0 4px;
     }
     .mtab-bar label{
       user-select:none;text-align:center;padding:10px 12px;border-radius:12px;
       border:1px solid var(--border);background:#1b1d23;color:var(--text);font-weight:700
     }
-    #mt_data:checked ~ .mtab-bar label[for="mt_data"],
-    #mt_train:checked ~ .mtab-bar label[for="mt_train"],
-    #mt_infer:checked ~ .mtab-bar label[for="mt_infer"]{outline:2px solid var(--acc);}
+    #mt_data:checked ~ .mtab-wrap .mtab-bar label[for="mt_data"],
+    #mt_train:checked ~ .mtab-wrap .mtab-bar label[for="mt_train"],
+    #mt_infer:checked ~ .mtab-wrap .mtab-bar label[for="mt_infer"]{outline:2px solid var(--acc);}
     .panels > section{display:none}
     #mt_data:checked ~ .panels #panel_data{display:block}
     #mt_train:checked ~ .panels #panel_train{display:block}
@@ -109,7 +115,7 @@
     table{width:100%;border-collapse:collapse}
     td{padding:4px}
     .cell{ text-align:left; color:var(--muted); }
-    .graph div.bar_graph{ height: 18px; background:#0ea5e9; border-radius:6px }
+    .graph div.bar_graph{ height: 18px; border-radius:6px }
     .indicator{ width:0px; color:#f99; }
     #radio, #indicator, #graph{ width:100% }
 
@@ -135,62 +141,65 @@
 </head>
 <body>
   <div class="container">
-    <header>
-      <h1>手書き認識 — スマホ対応</h1>
-    </header>
 
-    <!-- Drawing area (shared across tabs) -->
-    <div class="canvas-card stack">
-      <div class="toolbar">
-        <div class="group">
-          <label for="color" class="small">線の色</label>
-          <input type="color" id="color" value="#77cc77">
-        </div>
-        <div class="group" style="margin-left:auto">
-          <button class="btn" id="clear_canvas" type="button">Clear</button>
-        </div>
-      </div>
-      <canvas id="canvas" width="280" height="280"></canvas>
-    </div>
-
-    <!-- Keep the existing softmax/batch-size toggle and analytics tables visible regardless of tab -->
-    <div class="card">
-      <div class="toggle-bar">
-        <label for="tab_softmax">ソフトマックス</label>
-        <input class="tiny" type="radio" name="tab" id="tab_softmax" value="softmax" checked>
-        <label for="tab_batch_size">バッチサイズ</label>
-        <input class="tiny" type="radio" name="tab" id="tab_batch_size" value="batch_size">
-      </div>
-      <div class="analytics" style="margin-top:10px">
-        <div class="panel">
-          <table id="label"></table>
-        </div>
-        <div class="panel">
-          <table id="graph"></table>
-        </div>
-        <div class="panel">
-          <table id="radio"></table>
-          <table id="indicator" style="margin-top:6px"></table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Tabs -->
+    <!-- Main Tabs moved to the top (sticky) -->
     <div class="mtabs">
       <input type="radio" name="mainTab" id="mt_data" checked>
       <input type="radio" name="mainTab" id="mt_train">
       <input type="radio" name="mainTab" id="mt_infer">
 
-      <div class="mtab-bar">
-        <label for="mt_data">データ作成</label>
-        <label for="mt_train">学習</label>
-        <label for="mt_infer">推論</label>
+      <div class="mtab-wrap">
+        <div class="mtab-bar">
+          <label for="mt_data">データ作成</label>
+          <label for="mt_train">学習</label>
+          <label for="mt_infer">推論</label>
+        </div>
+      </div>
+
+      <header>
+        <h1>手書き認識 — スマホ対応</h1>
+      </header>
+
+      <!-- Drawing area (shared across tabs) -->
+      <div class="canvas-card stack">
+        <div class="toolbar">
+          <div class="group">
+            <label for="color" class="small">線の色</label>
+            <input type="color" id="color" value="#77cc77">
+          </div>
+          <div class="group" style="margin-left:auto">
+            <button class="btn" id="clear_canvas" type="button">Clear</button>
+          </div>
+        </div>
+        <canvas id="canvas" width="280" height="280"></canvas>
+      </div>
+
+      <!-- Keep the existing softmax/batch-size toggle and analytics tables visible regardless of tab -->
+      <div class="card" style="margin-top:10px">
+        <div class="toggle-bar">
+          <label for="tab_softmax">ソフトマックス</label>
+          <input class="tiny" type="radio" name="tab" id="tab_softmax" value="softmax" checked>
+          <label for="tab_batch_size">バッチサイズ</label>
+          <input class="tiny" type="radio" name="tab" id="tab_batch_size" value="batch_size">
+        </div>
+        <div class="analytics" style="margin-top:10px">
+          <div class="panel">
+            <table id="label"></table>
+          </div>
+          <div class="panel">
+            <table id="graph"></table>
+          </div>
+          <div class="panel">
+            <table id="radio"></table>
+            <table id="indicator" style="margin-top:6px"></table>
+          </div>
+        </div>
       </div>
 
       <div class="panels">
 
         <!-- データ作成 -->
-        <section id="panel_data" class="stack">
+        <section id="panel_data" class="stack" style="margin-top:10px">
           <div class="card grid grid-2">
             <div class="stack">
               <label class="small" for="predict_type">種別</label>
@@ -212,7 +221,7 @@
         </section>
 
         <!-- 学習 -->
-        <section id="panel_train" class="stack">
+        <section id="panel_train" class="stack" style="margin-top:10px">
           <div class="card grid grid-3">
             <div class="stack">
               <label class="small" for="learning_rate">学習率</label>
@@ -240,7 +249,7 @@
         </section>
 
         <!-- 推論 -->
-        <section id="panel_infer" class="stack">
+        <section id="panel_infer" class="stack" style="margin-top:10px">
           <div class="card grid grid-2" style="align-items:center">
             <div class="inline">
               <button class="btn primary" id="predict" type="button">Predict</button>
@@ -281,8 +290,37 @@
   <script type="text/javascript" src="network.js"></script>
   <script type="text/javascript" src="main.js"></script>
 
+  <!-- Touch -> Mouse polyfill for mobile drawing -->
   <script>
-    // Optional: remember selected main tab
+    (function(){
+      const canvas = document.getElementById('canvas');
+      if(!canvas) return;
+      function dispatchMouse(type, touch){
+        const evt = new MouseEvent(type, {
+          bubbles:true, cancelable:true,
+          clientX: touch.clientX, clientY: touch.clientY
+        });
+        canvas.dispatchEvent(evt);
+      }
+      const opt = {passive:false};
+      canvas.addEventListener('touchstart', function(ev){
+        if(ev.touches && ev.touches.length){ dispatchMouse('mousedown', ev.touches[0]); ev.preventDefault(); }
+      }, opt);
+      canvas.addEventListener('touchmove', function(ev){
+        if(ev.touches && ev.touches.length){ dispatchMouse('mousemove', ev.touches[0]); ev.preventDefault(); }
+      }, opt);
+      canvas.addEventListener('touchend', function(ev){
+        const t = (ev.changedTouches && ev.changedTouches[0]) || (ev.touches && ev.touches[0]);
+        dispatchMouse('mouseup', t || {clientX:0, clientY:0}); ev.preventDefault();
+      }, opt);
+      canvas.addEventListener('touchcancel', function(){ 
+        canvas.dispatchEvent(new MouseEvent('mouseup', {bubbles:true, cancelable:true}));
+      }, opt);
+    })();
+  </script>
+
+  <script>
+    // Remember selected main tab
     (function(){
       const radios = document.querySelectorAll('input[name="mainTab"]');
       const key = 'hw_mobile_mainTab';
@@ -296,50 +334,5 @@
       }));
     })();
   </script>
-
-  <script>
-    // Mobile touch support: translate touch events to existing mouse handlers
-    (function(){
-      const canvas = document.getElementById('canvas');
-      if(!canvas) return;
-      canvas.style.touchAction = 'none';
-      function dispatchMouse(type, touch){
-        const evt = new MouseEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          clientX: touch.clientX,
-          clientY: touch.clientY
-        });
-        canvas.dispatchEvent(evt);
-      }
-      canvas.addEventListener('touchstart', function(ev){
-        if(ev.touches && ev.touches.length){
-          dispatchMouse('mousedown', ev.touches[0]);
-          ev.preventDefault();
-        }
-      }, {passive:false});
-      canvas.addEventListener('touchmove', function(ev){
-        if(ev.touches && ev.touches.length){
-          dispatchMouse('mousemove', ev.touches[0]);
-          ev.preventDefault();
-        }
-      }, {passive:false});
-      canvas.addEventListener('touchend', function(ev){
-        const t = (ev.changedTouches && ev.changedTouches[0]) || (ev.touches && ev.touches[0]);
-        if(t){
-          dispatchMouse('mouseup', t);
-        } else {
-          const evt = new MouseEvent('mouseup', {bubbles:true, cancelable:true});
-          canvas.dispatchEvent(evt);
-        }
-        ev.preventDefault();
-      }, {passive:false});
-      canvas.addEventListener('touchcancel', function(ev){
-        const evt = new MouseEvent('mouseup', {bubbles:true, cancelable:true});
-        canvas.dispatchEvent(evt);
-      }, {passive:false});
-    })();
-  </script>
 </body>
 </html>
-
