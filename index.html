@@ -57,6 +57,7 @@
     #canvas{
       display:block;margin:0 auto; background:#fff; border:1px solid #aaa;
       width:100%; max-width: 360px; height:auto; aspect-ratio:1/1;
+      touch-action: none; -ms-touch-action: none; user-select: none; -webkit-user-select: none;
     }
     #predicted{
       background:#fff;color:#111;width:120px;height:120px;
@@ -295,5 +296,50 @@
       }));
     })();
   </script>
+
+  <script>
+    // Mobile touch support: translate touch events to existing mouse handlers
+    (function(){
+      const canvas = document.getElementById('canvas');
+      if(!canvas) return;
+      canvas.style.touchAction = 'none';
+      function dispatchMouse(type, touch){
+        const evt = new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        });
+        canvas.dispatchEvent(evt);
+      }
+      canvas.addEventListener('touchstart', function(ev){
+        if(ev.touches && ev.touches.length){
+          dispatchMouse('mousedown', ev.touches[0]);
+          ev.preventDefault();
+        }
+      }, {passive:false});
+      canvas.addEventListener('touchmove', function(ev){
+        if(ev.touches && ev.touches.length){
+          dispatchMouse('mousemove', ev.touches[0]);
+          ev.preventDefault();
+        }
+      }, {passive:false});
+      canvas.addEventListener('touchend', function(ev){
+        const t = (ev.changedTouches && ev.changedTouches[0]) || (ev.touches && ev.touches[0]);
+        if(t){
+          dispatchMouse('mouseup', t);
+        } else {
+          const evt = new MouseEvent('mouseup', {bubbles:true, cancelable:true});
+          canvas.dispatchEvent(evt);
+        }
+        ev.preventDefault();
+      }, {passive:false});
+      canvas.addEventListener('touchcancel', function(ev){
+        const evt = new MouseEvent('mouseup', {bubbles:true, cancelable:true});
+        canvas.dispatchEvent(evt);
+      }, {passive:false});
+    })();
+  </script>
 </body>
 </html>
+
