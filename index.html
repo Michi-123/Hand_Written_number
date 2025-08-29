@@ -28,6 +28,7 @@
   /* Panels that existing JS reads by id are kept, we just toggle visibility by body class */
   #label, #graph, #radio, #indicator { background:#fff; border:1px solid #ddd; border-radius:8px; padding:6px; }
   #graph .bar_graph { background-color:#00cc00; height:12px; border-radius:6px; }
+  #indicator .ind-pip { display:inline-block; margin-left:4px; }
   table { border-collapse: collapse; }
   td.cell { text-align:center; padding:4px 6px; }
 
@@ -236,6 +237,80 @@
     }
     buttons.forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
     setTab('infer'); // default
+  })();
+
+  // ===== Data tab: build radios linked to labels =====
+  (function(){
+    const labelTable = document.getElementById('label');
+    const radioTable = document.getElementById('radio');
+    const indicatorTable = document.getElementById('indicator');
+    const predictType = document.getElementById('predict_type');
+    const addBtn = document.getElementById('add_btn');
+
+    function buildRadiosFromLabel(){
+      if (!labelTable || !radioTable) return;
+      const cells = Array.from(labelTable.querySelectorAll('.cell'));
+      const prev = radioTable.querySelector('input[name="num"]:checked')?.value ?? null;
+      radioTable.innerHTML = '';
+      cells.forEach((cell, idx) => {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'num';
+        input.value = String(idx);
+        if ((prev === null && idx === 0) || prev == String(idx)) input.checked = true;
+
+        const label = document.createElement('label');
+        label.style.marginLeft = '8px';
+        label.textContent = cell.textContent || String(idx);
+
+        // clicking label row selects radio
+        if (cell && cell.parentElement) {
+          cell.style.cursor = 'pointer';
+          cell.parentElement.addEventListener('click', () => { input.checked = true; });
+        }
+
+        td.appendChild(input);
+        td.appendChild(label);
+        tr.appendChild(td);
+        radioTable.appendChild(tr);
+      });
+    }
+
+    function refreshDataTab(){
+      if (typeof changeLabel === 'function') { try { changeLabel(); } catch(e){} }
+      buildRadiosFromLabel();
+    }
+
+    // Build on load if already on data tab
+    if (document.body.classList.contains('tab-data')) refreshDataTab();
+
+    // Rebuild when switching tabs to data
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if (btn.dataset.tab === 'data') setTimeout(refreshDataTab,0);
+      });
+    });
+
+    // Rebuild on predict type changes
+    if (predictType) predictType.addEventListener('change', refreshDataTab);
+
+    // Indicator effect when Add is clicked (visual cue in the selected row)
+    function markIndicator(){
+      const sel = radioTable.querySelector('input[name="num"]:checked');
+      if (!sel || !indicatorTable) return;
+      const idx = sel.value;
+      const cell = indicatorTable.querySelector('.n'+idx);
+      if (!cell) return;
+      const pip = document.createElement('span');
+      pip.className = 'ind-pip';
+      pip.textContent = '▉';
+      cell.appendChild(pip);
+    }
+
+    if (addBtn) addBtn.addEventListener('click', markIndicator);
+
   })();
 
   // ===== Mobile drawing support (touch events) =====
