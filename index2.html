@@ -699,15 +699,126 @@ function getCanvasData() {
     return block;
 }
 
-// Dummy implementations for missing functions
-function predict() {
-    console.log('Predict function called');
-    document.getElementById('predicted').textContent = target[Math.floor(Math.random() * target.length)];
-    document.getElementById('hypothesis').textContent = (Math.random()).toFixed(3);
+// Neural Network Implementation
+var cW1 = [], cW2 = [], cb1 = [], cb2 = [];  // Convolutional weights and biases
+var W1 = [], b1 = [], W2 = [], b2 = [];     // Fully connected weights and biases
+var h1 = [], h2 = [], h_fn = [], h_dropout = [];
+var losses = [];
+var drop_rate = 0.5;
+
+// Initialize with random weights
+initializeWeights();
+
+function initializeWeights() {
+    // Initialize convolutional layers (simplified)
+    cW1 = createRandomMatrix(8, 1, 3, 3);  // 8 filters, 1 channel, 3x3
+    cW2 = createRandomMatrix(16, 8, 3, 3); // 16 filters, 8 channels, 3x3
+    cb1 = createRandomArray(8);
+    cb2 = createRandomArray(16);
     
-    // Generate dummy data for graph
-    const dummyH = target.map(() => Math.random() * 2 - 1);
-    drawSoftmaxGraph(dummyH);
+    // Initialize fully connected layers
+    W1 = createRandomMatrix(400, 128);  // Flattened conv output to hidden
+    b1 = createRandomArray(128);
+    W2 = createRandomMatrix(128, target.length);  // Hidden to output
+    b2 = createRandomArray(target.length);
+}
+
+function createRandomMatrix(...dimensions) {
+    if (dimensions.length === 2) {
+        const [rows, cols] = dimensions;
+        return Array(rows).fill().map(() => 
+            Array(cols).fill().map(() => (Math.random() - 0.5) * 0.2)
+        );
+    } else if (dimensions.length === 4) {
+        const [filters, channels, height, width] = dimensions;
+        return Array(filters).fill().map(() =>
+            Array(channels).fill().map(() =>
+                Array(height).fill().map(() =>
+                    Array(width).fill().map(() => (Math.random() - 0.5) * 0.2)
+                )
+            )
+        );
+    }
+}
+
+function createRandomArray(size) {
+    return Array(size).fill().map(() => (Math.random() - 0.5) * 0.1);
+}
+
+function predict(x, train) {
+    if (!x) {
+        x = getCanvasData();
+    }
+    
+    // Simplified forward pass
+    let h = flattenInput(x[0]);  // Flatten 2D input to 1D
+    
+    // First layer
+    h = affine(h, W1, b1);
+    h = relu(h);
+    
+    // Output layer
+    h = affine(h, W2, b2);
+    
+    const y = indexOfMax(h);
+    const maxVal = Math.max(...h);
+    const predicted = target[y] || '?';
+    
+    if (!train) {
+        console.log('predicted', predicted);
+        document.getElementById('predicted').textContent = predicted;
+        document.getElementById('hypothesis').textContent = maxVal.toFixed(3);
+        drawSoftmaxGraph(h);
+    }
+    
+    return h;
+}
+
+function flattenInput(input2D) {
+    const flattened = [];
+    for (let i = 0; i < input2D.length; i++) {
+        for (let j = 0; j < input2D[i].length; j++) {
+            flattened.push(input2D[i][j]);
+        }
+    }
+    
+    // Pad or truncate to expected size
+    while (flattened.length < 400) flattened.push(0);
+    return flattened.slice(0, 400);
+}
+
+function affine(x, w, b) {
+    const out = [];
+    for (let i = 0; i < w.length; i++) {
+        let sum = 0;
+        for (let j = 0; j < w[i].length; j++) {
+            sum += x[j] * w[i][j];
+        }
+        out.push(sum + (b ? b[i] : 0));
+    }
+    return out;
+}
+
+function relu(x) {
+    return x.map(val => Math.max(0, val));
+}
+
+function indexOfMax(arr) {
+    if (arr.length === 0) return -1;
+    let maxIndex = 0;
+    for (let i = 1; i < arr.length; i++) {
+        if (arr[i] > arr[maxIndex]) {
+            maxIndex = i;
+        }
+    }
+    return maxIndex;
+}
+
+function softmax(arr) {
+    const max = Math.max(...arr);
+    const exp = arr.map(x => Math.exp(x - max));
+    const sum = exp.reduce((a, b) => a + b, 0);
+    return exp.map(x => x / sum);
 }
 
 function train() {
@@ -715,13 +826,49 @@ function train() {
         alert('訓練データがありません。まずデータを追加してください。');
         return;
     }
-    console.log('Train function called');
-    document.getElementById('loss').textContent = (Math.random() * 0.5).toFixed(4);
+    
+    const epoch = parseInt(document.getElementById('epoch').value);
+    const learningRate = parseFloat(document.getElementById('learning_rate').value);
+    let totalLoss = 0;
+    
+    console.log(`Training for ${epoch} epochs with ${X_batch.length} samples`);
+    
+    for (let e = 0; e < epoch; e++) {
+        let epochLoss = 0;
+        
+        for (let i = 0; i < X_batch.length; i++) {
+            const h = predict(X_batch[i], true);
+            const y = softmax(h);
+            
+            // Simple loss calculation (cross-entropy approximation)
+            for (let j = 0; j < y.length; j++) {
+                const error = y[j] - T_batch[i][j];
+                epochLoss += Math.abs(error);
+                
+                // Simple weight update (gradient descent approximation)
+                for (let k = 0; k < W2[j].length; k++) {
+                    W2[j][k] -= learningRate * error * 0.01;
+                }
+                if (b2[j] !== undefined) {
+                    b2[j] -= learningRate * error * 0.01;
+                }
+            }
+        }
+        
+        epochLoss /= X_batch.length;
+        totalLoss += epochLoss;
+        console.log(`Epoch ${e + 1}: Loss = ${epochLoss.toFixed(4)}`);
+    }
+    
+    const avgLoss = totalLoss / epoch;
+    document.getElementById('loss').textContent = avgLoss.toFixed(4);
+    console.log(`Training completed. Average loss: ${avgLoss.toFixed(4)}`);
 }
 
 function initWeights() {
     if (!confirm("Are you sure initialize Weights?")) return;
-    console.log('Initialize weights');
+    initializeWeights();
+    console.log('Weights initialized');
 }
 </script>
 
