@@ -74,7 +74,7 @@
   <div class="workspace">
     <!-- Left: Canvas -->
     <section class="panel">
-      <h3 style="margin-top:0">手書き入力６</h3>
+      <h3 style="margin-top:0">手書き入力7</h3>
       <canvas id="canvas" width="280" height="280"></canvas>
       
     </section>
@@ -139,7 +139,7 @@
           </div>
           <div style="margin-left:18px;min-width:200px">
             <div style="font-size:12px;color:var(--muted);margin-bottom:6px">強さ</div>
-            $1
+            <div id="hypothesis" style="display:none"></div>
             <div class="classes-wrap" style="margin-top:8px">
               <table id="classes_pred"><!-- JSで行を生成 --></table>
             </div>
@@ -319,7 +319,10 @@
 
 // ---- Clear buttons bind (works with original .clear_canvas handler in main.js) ----
 (function(){
-  $('.clear_canvas').on('click', function(){ try{ clearCanvas(); }catch(e){} $('#classes_pred .graph').empty(); }); }catch(e){} $('#classes_pred .graph').empty(); });
+  $('.clear_canvas').on('click', function(){
+    try { clearCanvas(); } catch(e){}
+    $('#classes_pred .graph').empty();
+  });
 })();
 
 // Initialize dynamic table after assets load
