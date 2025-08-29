@@ -1,425 +1,304 @@
+
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>Handwritten Recognition — V2</title>
-  <style>
-    :root{
-      --bg:#0b0b0c;
-      --card:#15161a;
-      --muted:#9aa3af;
-      --text:#e5e7eb;
-      --acc:#4ade80;
-      --border:#2a2d34;
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      background:var(--bg);
-      color:var(--text);
-      font-family: system-ui,-apple-system, Segoe UI, Roboto, Noto Sans JP, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      line-height:1.5;
-    }
-    .container{
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 0 12px 80px;
-    }
-    header{
-      display:flex;align-items:center;justify-content:space-between;
-      gap:12px;margin:10px 0 12px;
-    }
-    header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
-    .toolbar{
-      display:flex;flex-wrap:wrap;gap:8px;align-items:center;
-      background: var(--card); border:1px solid var(--border);
-      padding:10px;border-radius:12px;
-    }
-    .toolbar .group{display:flex;gap:8px;align-items:center}
-    .toolbar input[type="color"]{width:40px;height:32px;border:none;background:#0000}
-    .btn{
-      appearance:none;border:1px solid var(--border);background:#1b1d23;
-      color:var(--text);padding:10px 14px;border-radius:12px;
-      font-size:14px; font-weight:600; cursor:pointer
-    }
-    .btn:active{transform:translateY(1px)}
-    .btn.primary{border-color:#1f2937;background:#111827}
-    .btn.success{border-color:#144c2e;background:#0f3f25}
-    .btn.warn{border-color:#5b3a02;background:#3a2801}
-    .stack{display:flex;flex-direction:column;gap:10px}
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+GPT1
+  <title>Hand written recognition (Mobile Tabs)</title>
+<style>
+  :root{
+    --pad: 10px;
+    --gap: 12px;
+    --radius: 10px;
+    --bg: #0b0b0c;
+    --panel:#1a1b1e;
+    --line:#2a2b30;
+    --text:#eaeef3;
+    --muted:#a7b0bd;
+    --accent:#5bbcff;
+    --ok:#00cc00;
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;}
+  *{box-sizing:border-box}
 
-    /* Canvas area */
-    .canvas-card{
-      background: var(--card); border:1px solid var(--border);
-      border-radius: 14px; padding: 12px; margin-top:8px;
-    }
-    #canvas{
-      display:block;margin:0 auto; background:#fff; border:1px solid #aaa;
-      width:100%; max-width: 360px; height:auto; aspect-ratio:1/1;
-      touch-action:none; user-select:none; -webkit-user-select:none;
-    }
-    #predicted{
-      background:#fff;color:#111;width:120px;height:120px;
-      text-align:center;font-size:72px;border:1px solid #ccc;
-      display:flex;align-items:center;justify-content:center;border-radius:12px;
-    }
+  /* ===== Top Tabs ===== */
+  .tabs{position:sticky;top:0;z-index:5;background:linear-gradient(180deg, rgba(0,0,0,.65), rgba(0,0,0,0));padding:var(--pad) var(--pad) 0}
+  .tabbar{display:flex;gap:8px;}
+  .tabbar button{flex:1;appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:10px 12px;border-radius:999px;font-weight:600}
+  .tabbar button[aria-selected="true"]{outline:2px solid var(--accent);}
 
-    /* Top-level tabs (three panels) */
-    .mtabs{margin:0}
-    .mtabs input[type=radio]{display:none}
-    .mtab-wrap{
-      position: sticky; top: 0; z-index: 50;
-      padding: max(6px, env(safe-area-inset-top)) 0 8px;
-      background: linear-gradient(180deg, rgba(11,11,12,.98), rgba(11,11,12,.92));
-      backdrop-filter: blur(8px);
-    }
-    .mtab-bar{
-      display:grid;grid-template-columns: 1fr 1fr 1fr; gap:8px;
-      margin:0 0 4px;
-    }
-    .mtab-bar label{
-      user-select:none;text-align:center;padding:10px 12px;border-radius:12px;
-      border:1px solid var(--border);background:#1b1d23;color:var(--text);font-weight:700
-    }
-    #mt_data:checked ~ .mtab-wrap .mtab-bar label[for="mt_data"],
-    #mt_train:checked ~ .mtab-wrap .mtab-bar label[for="mt_train"],
-    #mt_infer:checked ~ .mtab-wrap .mtab-bar label[for="mt_infer"]{outline:2px solid var(--acc);}
-    .panels > section{display:none}
-    #mt_data:checked ~ .panels #panel_data{display:block}
-    #mt_train:checked ~ .panels #panel_train{display:block}
-    #mt_infer:checked ~ .panels #panel_infer{display:block}
+  main{padding:var(--pad);}
 
-    .card{
-      background: var(--card); border:1px solid var(--border);
-      border-radius: 14px; padding: 12px;
-    }
-    .grid{
-      display:grid; gap:10px;
-    }
-    .grid-2{grid-template-columns: 1fr 1fr}
-    .grid-3{grid-template-columns: repeat(3, 1fr)}
-    @media (max-width: 900px){
-      .grid-2,.grid-3{grid-template-columns: 1fr}
-      #predicted{width:96px;height:96px;font-size:56px}
-    }
+  /* ===== Canvas & Controls ===== */
+  .workspace{display:grid;grid-template-columns:1fr;gap:var(--gap);}
+  @media (min-width: 900px){
+    .workspace{grid-template-columns: 320px 1fr;align-items:start}
+  }
 
-    /* Existing analytics area (labels / graph / radio / indicator) */
-    .analytics{
-      display:grid; gap:10px; grid-template-columns: repeat(3, minmax(0,1fr));
-    }
-    .analytics .panel{background:#101217;border:1px solid var(--border);border-radius:12px;padding:8px;min-height:60px}
-    @media (max-width: 640px){
-      .analytics{grid-template-columns:1fr}
-    }
-    table{width:100%;border-collapse:collapse}
-    td{padding:4px}
-    .cell{ text-align:left; color:var(--muted); }
-    .graph div.bar_graph{ height: 18px; border-radius:6px }
-    .indicator{ width:0px; color:#f99; }
-    #radio, #indicator, #graph{ width:100% }
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:var(--pad)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  label.inline{font-size:14px;color:var(--muted)}
+  input[type="number"], input[type="text"], input[type="range"], select{background:#0e0f12;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+  input[type="range"]{width:180px}
+  .btn{appearance:none;border:1px solid var(--line);background:#141519;color:var(--text);padding:8px 12px;border-radius:10px;font-weight:600}
+  .btn.ok{border-color:#0d3;}
 
-    /* Softmax / batch-size toggle (kept for compatibility with main.js) */
-    .toggle-bar{
-      display:flex; gap:8px; flex-wrap:wrap; align-items:center;
-      margin-top:6px;
-    }
-    .toggle-bar label{font-weight:600}
-    input[type="radio"].tiny{ width:16px; height:16px }
+  /* Canvas */
+  #canvas{background:#fff;border:1px solid #aaa;border-radius:8px;touch-action:none;display:block;width:min(92vw, 360px);height:min(92vw, 360px)}
 
-    /* Inputs */
-    .input, select{
-      background:#111827;border:1px solid var(--border);color:var(--text);
-      border-radius:10px;padding:8px 10px;font-size:14px
-    }
-    .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .small{font-size:12px;color:var(--muted)}
+  /* Classes table (horizontal like table1) */
+  .classes-wrap{overflow:auto}
+  table#classes{width:100%;border-collapse:collapse}
+  table#classes td, table#classes th{border-bottom:1px solid var(--line);padding:8px}
+  table#classes tr:hover{background:#13161c}
+  td.cell{width:42px;text-align:center;font-weight:700}
+  td.graph{min-width:160px}
+  .bar{height:12px;background:var(--ok);border-radius:6px}
+  td.indicator{color:#f99;white-space:nowrap}
 
-    /* Footer outputs */
-    .outputs{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-  
-    /* Character picker */
-    .char-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
-    .char-btn{
-      display:flex;align-items:center;justify-content:center;
-      border:1px solid var(--border); background:#1b1d23; color:var(--text);
-      border-radius:12px; padding:10px; font-weight:800; font-size:18px; cursor:pointer;
-      user-select:none;
-    }
-    .char-btn[aria-pressed="true"]{outline:2px solid var(--acc)}
-    @media (max-width:640px){ .char-grid{grid-template-columns:repeat(5,minmax(0,1fr))} }
-  </style>
+  /* Result area */
+  #predicted{background:#fff;color:#222;width:120px;height:120px;text-align:center;font-size:80px;border:1px solid #ccc;border-radius:8px;display:flex;align-items:center;justify-content:center}
+  #hypothesis{min-height:24px;color:var(--muted)}
+</style>
 </head>
 <body>
-  <div class="container">
 
-    <!-- Main Tabs moved to the top (sticky) -->
-    <div class="mtabs">
-      <input type="radio" name="mainTab" id="mt_data" checked>
-      <input type="radio" name="mainTab" id="mt_train">
-      <input type="radio" name="mainTab" id="mt_infer">
-
-      <div class="mtab-wrap">
-        <div class="mtab-bar">
-          <label for="mt_data">データ作成</label>
-          <label for="mt_train">学習</label>
-          <label for="mt_infer">推論</label>
-        </div>
-      </div>
-
-      <header>
-        <h1>手書き認識 — スマホ対応v2</h1>
-      </header>
-
-      <!-- Drawing area (shared across tabs) -->
-      <div class="canvas-card stack">
-        <div class="toolbar">
-          <div class="group">
-            <label for="color" class="small">線の色</label>
-            <input type="color" id="color" value="#77cc77">
-          </div>
-          <div class="group" style="margin-left:auto">
-            <button class="btn" id="clear_canvas" type="button">Clear</button>
-          </div>
-        </div>
-        <canvas id="canvas" width="280" height="280"></canvas>
-      </div>
-
-      <!-- Keep the existing softmax/batch-size toggle and analytics tables visible regardless of tab -->
-      <div class="card" style="margin-top:10px">
-        <div class="toggle-bar">
-          <label for="tab_softmax">ソフトマックス</label>
-          <input class="tiny" type="radio" name="tab" id="tab_softmax" value="softmax" checked>
-          <label for="tab_batch_size">バッチサイズ</label>
-          <input class="tiny" type="radio" name="tab" id="tab_batch_size" value="batch_size">
-        </div>
-        <div class="analytics" style="margin-top:10px">
-          <div class="panel">
-            <table id="label"></table>
-          </div>
-          <div class="panel">
-            <table id="graph"></table>
-          </div>
-          <div class="panel">
-            <table id="radio"></table>
-            <table id="indicator" style="margin-top:6px"></table>
-          </div>
-        </div>
-      </div>
-
-      <div class="panels">
-
-        <!-- データ作成 -->
-        <section id="panel_data" class="stack" style="margin-top:10px">\n  <div class="card">\n    <div class="stack">\n      <label class="small">文字の選択</label>\n      <div id="char_buttons" class="char-grid"></div>\n      <div class="small">選択中: <span id="selected_char">-</span></div>\n    </div>\n  </div>
-          <div class="card grid grid-2">
-            <div class="stack">
-              <label class="small" for="predict_type">種別</label>
-              <select id="predict_type" class="input">
-                <option value="0">数字</option>
-                <option value="1">アルファベット</option>
-                <option value="2">かな</option>
-                <option value="3">記号</option>
-              </select>
-            </div>
-            <div class="stack">
-              <label class="small">操作</label>
-              <div class="inline">
-                <button class="btn success" id="add_btn" type="button">Add</button>
-              </div>
-            </div>
-          </div>
-          <p class="small">※ ラジオボタンでラベルを選んでから「Add」で現在のキャンバスをバッチに追加します。</p>
-        </section>
-
-        <!-- 学習 -->
-        <section id="panel_train" class="stack" style="margin-top:10px">
-          <div class="card grid grid-3">
-            <div class="stack">
-              <label class="small" for="learning_rate">学習率</label>
-              <div class="inline">
-                <input id="learning_rate" class="input" value="0.1" style="width:80px;text-align:right">
-                <input type="range" id="learning_rate_range" min="0" max="5" style="flex:1">
-              </div>
-            </div>
-            <div class="stack">
-              <label class="small" for="epoch">エポック</label>
-              <input id="epoch" class="input" value="1" style="width:80px;text-align:right">
-            </div>
-            <div class="stack">
-              <label class="small">操作</label>
-              <div class="inline">
-                <button class="btn" id="init_weights" type="button">Init</button>
-                <button class="btn warn" id="clear_batch" type="button">Clr Bat</button>
-                <button class="btn primary" id="train_btn" type="button">Train</button>
-              </div>
-            </div>
-          </div>
-          <div class="outputs small">
-            <div>loss: <span id="loss"></span></div>
-          </div>
-        </section>
-
-        <!-- 推論 -->
-        <section id="panel_infer" class="stack" style="margin-top:10px">
-          <div class="card grid grid-2" style="align-items:center">
-            <div class="inline">
-              <button class="btn primary" id="predict" type="button">Predict</button>
-            </div>
-            <div class="inline" style="gap:16px">
-              <div class="stack">
-                <span class="small">Predict:</span>
-                <div id="predicted"></div>
-              </div>
-              <div class="stack">
-                <div class="small">H: <span id="hypothesis"> </span></div>
-                <span id="hypothesis_all" style="display:none"></span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-      </div>
-    </div>
-
+<div class="tabs" role="tablist" aria-label="handwrite tabs">
+  <div class="tabbar">
+    <button id="tab-data" role="tab" aria-controls="panel-data" aria-selected="true">データ作成</button>
+    <button id="tab-train" role="tab" aria-controls="panel-train" aria-selected="false">学習</button>
+    <button id="tab-infer" role="tab" aria-controls="panel-infer" aria-selected="false">推論</button>
   </div>
+</div>
 
-  <!-- Scripts: keep original IDs and filenames so existing JS continues to work -->
-  <script type="text/javascript" src="canvas.js"></script>
-  <script type="text/javascript" src="jquery.js"></script>
+<main>
+  <div class="workspace">
+    <!-- Left: Canvas -->
+    <section class="panel">
+      <h3 style="margin-top:0">手書き入力</h3>
+      <canvas id="canvas" width="280" height="280"></canvas>
+      <div class="row" style="margin-top:8px">
+        <label class="inline">線色</label>
+        <input type="color" id="pen_color" value="#ff7777"/>
+        <!-- 互換性維持のため hidden の#color を同期して残す -->
+        <input type="color" id="color" value="#ff7777" style="display:none"/>
+        <button class="btn clear_canvas">Clear</button>
+        <button class="btn" id="add_btn">Add</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="inline">種別</label>
+        <select id="predict_type">
+          <option value="0">数字</option>
+          <option value="1">アルファベット</option>
+          <option value="2">かな</option>
+          <option value="3">記号</option>
+        </select>
+      </div>
+    </section>
 
-  <!-- Pretrained / initial weights (as in original) -->
-  <script type="text/javascript" src="data/cW1.js"></script>
-  <script type="text/javascript" src="data/cW2.js"></script>
-  <script type="text/javascript" src="data/cb1.js"></script>
-  <script type="text/javascript" src="data/cb2.js"></script>
-  <script type="text/javascript" src="data/W1.js"></script>
-  <script type="text/javascript" src="data/b1.js"></script>
-  <script type="text/javascript" src="data/W2.js"></script>
-  <script type="text/javascript" src="data/b2.js"></script>
+    <!-- Right: Tabs content -->
+    <section>
+      <!-- データ作成 / 学習 / 推論 の各パネル -->
+      <div id="panel-data" class="panel" role="tabpanel" aria-labelledby="tab-data">
+        <h3 style="margin-top:0">データ作成</h3>
+        <div class="row">
+          <button class="btn" id="clear_batch">Clr Bat</button>
+        </div>
+        <div class="classes-wrap" style="margin-top:8px">
+          <table id="classes"><!-- JSで行を生成 --></table>
+        </div>
+      </div>
 
-  <!-- Core logic -->
-  <script type="text/javascript" src="network.js"></script>
-  <script type="text/javascript" src="main.js"></script>
+      <div id="panel-train" class="panel" role="tabpanel" hidden aria-labelledby="tab-train">
+        <h3 style="margin-top:0">学習</h3>
+        <div class="row">
+          <label class="inline">学習率</label>
+          <input id="learning_rate" value="0.1" style="width:80px;text-align:right">
+          <input type="range" id="learning_rate_range" min="0" max="5">
+          <label class="inline">エポック</label>
+          <input id="epoch" value="1" style="width:60px;text-align:right">
+          <button class="btn" id="init_weights">Init</button>
+          <button class="btn ok" id="train_btn">Train</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label class="inline">損失:</label>
+          <span id="loss"></span>
+        </div>
+      </div>
 
-  <!-- Touch -> Mouse polyfill for mobile drawing -->
-  <script>
-    (function(){
-      const canvas = document.getElementById('canvas');
-      if(!canvas) return;
-      function dispatchMouse(type, touch){
-        const evt = new MouseEvent(type, {
-          bubbles:true, cancelable:true,
-          clientX: touch.clientX, clientY: touch.clientY
-        });
-        canvas.dispatchEvent(evt);
-      }
-      const opt = {passive:false};
-      canvas.addEventListener('touchstart', function(ev){
-        if(ev.touches && ev.touches.length){ dispatchMouse('mousedown', ev.touches[0]); ev.preventDefault(); }
-      }, opt);
-      canvas.addEventListener('touchmove', function(ev){
-        if(ev.touches && ev.touches.length){ dispatchMouse('mousemove', ev.touches[0]); ev.preventDefault(); }
-      }, opt);
-      canvas.addEventListener('touchend', function(ev){
-        const t = (ev.changedTouches && ev.changedTouches[0]) || (ev.touches && ev.touches[0]);
-        dispatchMouse('mouseup', t || {clientX:0, clientY:0}); ev.preventDefault();
-      }, opt);
-      canvas.addEventListener('touchcancel', function(){ 
-        canvas.dispatchEvent(new MouseEvent('mouseup', {bubbles:true, cancelable:true}));
-      }, opt);
-    })();
-  </script>
+      <div id="panel-infer" class="panel" role="tabpanel" hidden aria-labelledby="tab-infer">
+        <h3 style="margin-top:0">推論</h3>
+        <div class="row">
+          <button class="btn ok" id="predict">Predict</button>
+          <button class="btn clear_canvas">Clear</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">予測結果</div>
+            <div id="predicted">&nbsp;</div>
+          </div>
+          <div style="margin-left:18px;min-width:200px">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">強さ</div>
+            <div id="hypothesis">&nbsp;</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
 
-  <script>
-    // Remember selected main tab
-    (function(){
-      const radios = document.querySelectorAll('input[name="mainTab"]');
-      const key = 'hw_mobile_mainTab';
-      const saved = localStorage.getItem(key);
-      if(saved){
-        const el = document.getElementById(saved);
-        if(el) el.checked = true;
-      }
-      radios.forEach(r => r.addEventListener('change', ()=>{
-        localStorage.setItem(key, r.id);
-      }));
-    })();
-  
-  <script>
-    (function(){
-      // Build character buttons based on global `target` array and sync to the hidden radio group (#radio)
-      function buildCharButtons(){
-        var host = document.getElementById('char_buttons');
-        var selView = document.getElementById('selected_char');
-        if(!host) return;
-        host.innerHTML = '';
-        if(typeof target === 'undefined' || !Array.isArray(target)){ return; }
+<!-- ====== Scripts (original assets) ====== -->
+<script src="jquery.js"></script>
+<script src="data/cW1.js"></script>
+<script src="data/cW2.js"></script>
+<script src="data/cb1.js"></script>
+<script src="data/cb2.js"></script>
+<script src="data/W1.js"></script>
+<script src="data/b1.js"></script>
+<script src="data/W2.js"></script>
+<script src="data/b2.js"></script>
+<script src="network.js"></script>
+<script src="canvas.js"></script>
+<script src="main.js"></script>
 
-        // If #radio was re-created by createTable(), ensure there is a checked item; default to first.
-        var radios = document.querySelectorAll('#radio input[name="num"]');
-        if(radios.length){
-          var checked = Array.from(radios).find(r => r.checked) || radios[0];
-          if(checked) checked.checked = true;
-        }
-
-        // Find current selected index (from radio), else 0
-        function getSelectedIdx(){
-          var r = document.querySelector('#radio input[name="num"]:checked');
-          return r ? parseInt(r.value, 10) : 0;
-        }
-
-        function setSelectedIdx(idx){
-          var r = document.querySelector('#radio input[name="num"][value="'+idx+'"]');
-          if(r){ r.checked = true; }
-          updateButtons();
-        }
-
-        function updateButtons(){
-          var idx = getSelectedIdx();
-          // update aria-pressed & selected label
-          Array.from(host.children).forEach((btn, i) => {
-            btn.setAttribute('aria-pressed', String(i === idx));
-          });
-          if(selView){ selView.textContent = target[idx] ?? '-'; }
-        }
-
-        target.forEach((ch, i) => {
-          var b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'char-btn';
-          b.textContent = ch;
-          b.setAttribute('data-idx', String(i));
-          b.setAttribute('aria-pressed', 'false');
-          b.addEventListener('click', function(){
-            var idx = parseInt(this.getAttribute('data-idx'), 10);
-            setSelectedIdx(idx);
-          });
-          host.appendChild(b);
-        });
-
-        updateButtons();
-      }
-
-      // Rebuild when labels change (predict_type change triggers main.js -> createTable())
-      document.addEventListener('DOMContentLoaded', function(){
-        // Initial build after main.js setup finishes
-        setTimeout(buildCharButtons, 0);
+<!-- ====== Overrides / Mobile enhancements ====== -->
+<script>
+// ---- Tabs ----
+(function(){
+  const tabs = [
+    {btn:'#tab-data', panel:'#panel-data'},
+    {btn:'#tab-train', panel:'#panel-train'},
+    {btn:'#tab-infer', panel:'#panel-infer'}
+  ];
+  tabs.forEach(t=>{
+    document.querySelector(t.btn).addEventListener('click', ()=>{
+      tabs.forEach(u=>{
+        const s = (u.btn===t.btn);
+        document.querySelector(u.btn).setAttribute('aria-selected', s);
+        document.querySelector(u.panel).hidden = !s;
       });
+    });
+  });
+})();
 
-      // Observe DOM changes on #radio to rebuild buttons (since createTable() recreates it)
-      var radioHost = document.getElementById('radio');
-      if (window.MutationObserver && radioHost){
-        var mo = new MutationObserver(function(){ buildCharButtons(); });
-        mo.observe(radioHost, {childList:true, subtree:true});
-      }
+// ---- Keep legacy #color in sync with #pen_color ----
+(function(){
+  const pen = document.getElementById('pen_color');
+  const legacy = document.getElementById('color');
+  function sync(){ legacy.value = pen.value; }
+  pen.addEventListener('input', sync);
+  sync();
+})();
 
-      // Also hook predict_type changes just in case
-      var sel = document.getElementById('predict_type');
-      if(sel){
-        sel.addEventListener('change', function(){ setTimeout(buildCharButtons, 0); });
-      }
-    })();
-  </script>
+// ---- Canvas: add touch/pointer support + coordinate scaling ----
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let drawing = false, bx=0, by=0;
+  function toCanvasXY(e){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = (e.touches? e.touches[0].clientX : e.clientX);
+    const clientY = (e.touches? e.touches[0].clientY : e.clientY);
+    return {x:(clientX - rect.left)*scaleX, y:(clientY - rect.top)*scaleY};
+  }
+  function pen(){ return document.getElementById('pen_color').value || '#000000'; }
+  function drawLine(x,y){
+    ctx.lineCap='round';
+    ctx.strokeStyle=pen();
+    ctx.lineWidth=10;
+    ctx.beginPath();
+    ctx.moveTo(bx,by);
+    ctx.lineTo(x,y);
+    ctx.stroke();
+    ctx.closePath();
+    bx=x; by=y;
+  }
+  function down(e){ e.preventDefault(); drawing=true; const p=toCanvasXY(e); bx=p.x; by=p.y; }
+  function move(e){ if(!drawing) return; e.preventDefault(); const p=toCanvasXY(e); drawLine(p.x,p.y); }
+  function up(e){ drawing=false; }
+
+  // Pointer if available
+  if(window.PointerEvent){
+    canvas.addEventListener('pointerdown', down, {passive:false});
+    canvas.addEventListener('pointermove', move, {passive:false});
+    canvas.addEventListener('pointerup', up, {passive:false});
+    canvas.addEventListener('pointerleave', up, {passive:false});
+  } else {
+    // Touch + Mouse fallback
+    canvas.addEventListener('touchstart', down, {passive:false});
+    canvas.addEventListener('touchmove', move, {passive:false});
+    canvas.addEventListener('touchend', up, {passive:false});
+    canvas.addEventListener('mousedown', down);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', up);
+  }
+})();
+
+// ---- Horizontal classes table generator (replaces #table2 vertical layout) ----
+// Override createTable() from main.js
+(function(){
+  function createHorizontalTable(){
+    const table = $('#classes');
+    table.empty();
+    for(let i=0; i<target.length; i++){
+      const row = $(`
+        <tr>
+          <td class="radio_button"><input type="radio" name="num" value="${i}" ${i===0?'checked':''}></td>
+          <td class="cell cellnum${i}">${target[i]}</td>
+          <td class="graph n${i}"></td>
+          <td class="indicator n${i}">&nbsp;</td>
+        </tr>`);
+      table.append(row);
+    }
+  }
+  // Replace global createTable
+  window.createTable = createHorizontalTable;
+})();
+
+// ---- Update drawSoftmaxGraph & addCanvasData selectors to new table ----
+(function(){
+  // keep original functions around if needed
+  const _drawSoftmaxGraph = window.drawSoftmaxGraph;
+  window.drawSoftmaxGraph = function(h){
+    const s = softmax(h);
+    // clear
+    $('#classes .graph').html('');
+    for(let i=0; i<s.length; i++){
+      const px = Math.max(1, Math.floor(s[i]*300));
+      $('#classes .graph.n'+i).html(`<div class="bar" style="width:${px}px"></div>`);
+    }
+  };
+
+  const _addCanvasData = window.addCanvasData;
+  window.addCanvasData = function(){
+    const num = $('input[name=num]:checked').val();
+    const el = $('#classes .indicator.n'+num);
+    const t = (el.text()||'') + String.fromCharCode(9609);
+    el.text(t);
+
+    // One-hot
+    const tvec = []; for(let i=0;i<target.length;i++){ tvec[i]=0; }
+    tvec[num] = 1;
+    X_batch.push(getCanvasData());
+    T_batch.push(tvec);
+    clearCanvas();
+  };
+})();
+
+// ---- Clear buttons bind (works with original .clear_canvas handler in main.js) ----
+(function(){
+  $('.clear_canvas').on('click', function(){ try{ clearCanvas(); }catch(e){} $('#classes .graph').empty(); });
+})();
+
+// Initialize dynamic table after assets load
+$(function(){
+  if(typeof createTable === 'function') createTable();
+});
 </script>
+
 </body>
 </html>
