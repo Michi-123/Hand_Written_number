@@ -74,7 +74,7 @@
   <div class="workspace">
     <!-- Left: Canvas -->
     <section class="panel">
-      <h3 style="margin-top:0">手書き入力５</h3>
+      <h3 style="margin-top:0">手書き入力６</h3>
       <canvas id="canvas" width="280" height="280"></canvas>
       
     </section>
@@ -167,19 +167,27 @@
 <script>
 // ---- Tabs ----
 (function(){
-  const tabs = [
-    {btn:'#tab-data', panel:'#panel-data'},
+  const config = [
+    {btn:'#tab-data',  panel:'#panel-data'},
     {btn:'#tab-train', panel:'#panel-train'},
     {btn:'#tab-infer', panel:'#panel-infer'}
   ];
-  tabs.forEach(t=>{
-    document.querySelector(t.btn).addEventListener('click', ()=>{
-      tabs.forEach(u=>{
-        const s = (u.btn===t.btn);
-        document.querySelector(u.btn).setAttribute('aria-selected', s);
-        const p = document.querySelector(u.panel); if (p) p.hidden = !s;
-      });
-    });
+  function selectTab(idx){
+    for(let i=0;i<config.length;i++){
+      const b = document.querySelector(config[i].btn);
+      const p = document.querySelector(config[i].panel);
+      if(b){ b.setAttribute('aria-selected', i===idx ? 'true' : 'false'); }
+      if(p){ p.hidden = (i!==idx); }
+    }
+    // 必要なテーブルが無ければ再生成（タブ切替時の初期化用）
+    try{ if(typeof window.createTable==='function'){ window.createTable(); } }catch(e){ console.warn(e); }
+  }
+  // 初期表示
+  selectTab(0);
+  // クリックハンドラ
+  config.forEach((t,idx)=>{
+    const b = document.querySelector(t.btn);
+    if(b){ b.addEventListener('click', function(){ selectTab(idx); }); }
   });
 })();
 
@@ -278,28 +286,34 @@
   // keep original functions around if needed
   const _drawSoftmaxGraph = window.drawSoftmaxGraph;
   window.drawSoftmaxGraph = function(h){
-    const s = softmax(h);
-    // clear
-    $('#classes_pred .graph').html('');
-    for(let i=0; i<s.length; i++){
-      const px = Math.max(1, Math.floor(s[i]*300));
-      $('#classes_pred .graph.n'+i).html(`<div class="bar" style="width:${px}px"></div>`);
-    }
+    try{
+      const s = softmax(h);
+      // clear
+      $('#classes_pred .graph').html('');
+      for(let i=0; i<s.length; i++){
+        const px = Math.max(1, Math.floor(s[i]*300));
+        const row = $('#classes_pred .graph.n'+i);
+        if(row && row.length){ row.html(`<div class="bar" style="width:${px}px"></div>`); }
+      }
+    }catch(e){ console.warn('drawSoftmaxGraph skipped:', e); }
   };
 
   const _addCanvasData = window.addCanvasData;
   window.addCanvasData = function(){
-    const num = $('input[name=num]:checked').val();
-    const el = $('#classes_data .indicator.n'+num);
-    const t = (el.text()||'') + String.fromCharCode(9609);
-    el.text(t);
-
-    // One-hot
-    const tvec = []; for(let i=0;i<target.length;i++){ tvec[i]=0; }
-    tvec[num] = 1;
-    X_batch.push(getCanvasData());
-    T_batch.push(tvec);
-    clearCanvas();
+    try{
+      const num = $('input[name=num]:checked').val();
+      const el = $('#classes_data .indicator.n'+num);
+      if(el && el.length){
+        const t = (el.text()||'') + String.fromCharCode(9609);
+        el.text(t);
+      }
+      // One-hot
+      const tvec = []; for(let i=0;i<target.length;i++){ tvec[i]=0; }
+      tvec[num] = 1;
+      X_batch.push(getCanvasData());
+      T_batch.push(tvec);
+      clearCanvas();
+    }catch(e){ console.warn('addCanvasData skipped:', e); }
   };
 })();
 
