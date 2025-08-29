@@ -29,6 +29,10 @@
   #label, #graph, #radio, #indicator { background:#fff; border:1px solid #ddd; border-radius:8px; padding:6px; }
   #graph .bar_graph { background-color:#00cc00; height:12px; border-radius:6px; }
   #indicator .ind-pip { display:inline-block; margin-left:4px; }
+  .choice-grid { display:grid; grid-template-columns: repeat(5, minmax(40px, 1fr)); gap:8px; }
+  @media (max-width: 720px){ .choice-grid{ grid-template-columns: repeat(5, 1fr); } }
+  .num-btn { border:1px solid #bbb; border-radius:8px; background:#fff; padding:8px 10px; min-height:44px; font-size:16px; }
+  .num-btn.active { background:#222; color:#fff; border-color:#222; }
   table { border-collapse: collapse; }
   td.cell { text-align:center; padding:4px 6px; }
 
@@ -49,9 +53,10 @@
   /* データ作成 */
   body.tab-data #canvas-row,
   body.tab-data #label,
-  body.tab-data #radio,
+  body.tab-data #choice_buttons,
   body.tab-data #indicator,
   body.tab-data #type-block { display:block; }
+  body.tab-data #radio { display:none; }
   body.tab-data #infer-controls,
   body.tab-data #graph,
   body.tab-data #train-controls,
@@ -140,6 +145,8 @@
       <tr><td class="cell cellnum8">8</td></tr>
       <tr><td class="cell cellnum9">9</td></tr>
     </table>
+
+    <div id="choice_buttons" class="choice-grid"></div>
 
     <table id="radio" style="display:none;">
       <tr><td><input type="radio" name="num" value="0" /></td></tr>
@@ -239,64 +246,81 @@
     setTab('infer'); // default
   })();
 
-  // ===== Data tab: build radios linked to labels =====
+  // ===== Data tab: build CHOICE BUTTONS (with hidden radios for compatibility) =====
   (function(){
     const labelTable = document.getElementById('label');
-    const radioTable = document.getElementById('radio');
+    const radioTable  = document.getElementById('radio'); // hidden, used by existing JS
     const indicatorTable = document.getElementById('indicator');
     const predictType = document.getElementById('predict_type');
     const addBtn = document.getElementById('add_btn');
+    const choiceWrap = document.getElementById('choice_buttons');
 
-    function buildRadiosFromLabel(){
-      if (!labelTable || !radioTable) return;
-      const cells = Array.from(labelTable.querySelectorAll('.cell'));
-      const prev = radioTable.querySelector('input[name="num"]:checked')?.value ?? null;
+    function selectIndex(idx){
+      // Update hidden radios
+      const radios = radioTable.querySelectorAll('input[name="num"]');
+      radios.forEach((r,i)=>{ r.checked = (i === idx); });
+      // Update visible buttons
+      choiceWrap.querySelectorAll('.num-btn').forEach(btn=>btn.classList.remove('active'));
+      const activeBtn = choiceWrap.querySelector('.num-btn[data-idx="'+idx+'"]');
+      if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    function buildHiddenRadios(count){
       radioTable.innerHTML = '';
-      cells.forEach((cell, idx) => {
+      for (let i=0;i<count;i++){
         const tr = document.createElement('tr');
         const td = document.createElement('td');
         const input = document.createElement('input');
-        input.type = 'radio';
-        input.name = 'num';
-        input.value = String(idx);
-        if ((prev === null && idx === 0) || prev == String(idx)) input.checked = true;
+        input.type = 'radio'; input.name = 'num'; input.value = String(i);
+        input.style.display = 'none';
+        td.appendChild(input); tr.appendChild(td); radioTable.appendChild(tr);
+      }
+    }
 
-        const label = document.createElement('label');
-        label.style.marginLeft = '8px';
-        label.textContent = cell.textContent || String(idx);
+    function buildButtonsFromLabel(){
+      if (!labelTable || !choiceWrap || !radioTable) return;
+      const cells = Array.from(labelTable.querySelectorAll('.cell'));
+      const prev = radioTable.querySelector('input[name="num"]:checked')?.value ?? null;
+      const count = cells.length;
+      buildHiddenRadios(count);
 
-        // clicking label row selects radio
+      choiceWrap.innerHTML = '';
+      cells.forEach((cell, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'num-btn';
+        btn.dataset.idx = String(idx);
+        btn.textContent = (cell.textContent || String(idx)).trim();
+        btn.addEventListener('click', ()=> selectIndex(idx));
+        choiceWrap.appendChild(btn);
+      });
+
+      // Clicking label rows also selects
+      cells.forEach((cell, idx)=>{
         if (cell && cell.parentElement) {
           cell.style.cursor = 'pointer';
-          cell.parentElement.addEventListener('click', () => { input.checked = true; });
+          cell.parentElement.addEventListener('click', ()=> selectIndex(idx));
         }
-
-        td.appendChild(input);
-        td.appendChild(label);
-        tr.appendChild(td);
-        radioTable.appendChild(tr);
       });
+
+      // Default selection
+      const initial = (prev !== null ? Number(prev) : 0);
+      selectIndex(Math.min(initial, count-1));
     }
 
     function refreshDataTab(){
       if (typeof changeLabel === 'function') { try { changeLabel(); } catch(e){} }
-      buildRadiosFromLabel();
+      buildButtonsFromLabel();
     }
 
-    // Build on load if already on data tab
     if (document.body.classList.contains('tab-data')) refreshDataTab();
 
-    // Rebuild when switching tabs to data
     document.querySelectorAll('.tab-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        if (btn.dataset.tab === 'data') setTimeout(refreshDataTab,0);
-      });
+      btn.addEventListener('click', ()=>{ if (btn.dataset.tab === 'data') setTimeout(refreshDataTab,0); });
     });
-
-    // Rebuild on predict type changes
     if (predictType) predictType.addEventListener('change', refreshDataTab);
 
-    // Indicator effect when Add is clicked (visual cue in the selected row)
+    // Indicator mark on Add
     function markIndicator(){
       const sel = radioTable.querySelector('input[name="num"]:checked');
       if (!sel || !indicatorTable) return;
@@ -308,7 +332,6 @@
       pip.textContent = '▉';
       cell.appendChild(pip);
     }
-
     if (addBtn) addBtn.addEventListener('click', markIndicator);
 
   })();
