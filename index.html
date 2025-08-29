@@ -74,7 +74,7 @@
   <div class="workspace">
     <!-- Left: Canvas -->
     <section class="panel">
-      <h3 style="margin-top:0">手書き入力7</h3>
+      <h3 style="margin-top:0">手書き入力8</h3>
       <canvas id="canvas" width="280" height="280"></canvas>
       
     </section>
@@ -308,7 +308,7 @@
         el.text(t);
       }
       // One-hot
-      const tvec = []; for(let i=0;i<target.length;i++){ tvec[i]=0; }
+      const C = (Array.isArray(window.W2) && Array.isArray(window.W2[0])) ? window.W2.length : target.length; const tvec = []; for(let i=0;i<C;i++){ tvec[i]=0; }
       tvec[num] = 1;
       X_batch.push(getCanvasData());
       T_batch.push(tvec);
@@ -323,6 +323,30 @@
     try { clearCanvas(); } catch(e){}
     $('#classes_pred .graph').empty();
   });
+})();
+
+// ---- Adapt output head to current class set & clear batches on label change ----
+(function(){
+  const _changeLabel = window.changeLabel;
+  window.changeLabel = function(){
+    if (typeof _changeLabel === 'function') _changeLabel();
+    try{
+      const C = (Array.isArray(window.target)? window.target.length : 0);
+      if (Array.isArray(window.W2) && Array.isArray(window.W2[0]) && C>0){
+        const D = window.W2[0].length;
+        if (window.W2.length !== C){
+          // rebuild last affine to match classes
+          window.W2 = Array.from({length: C}, ()=> Array.from({length: D}, ()=> random_normal()));
+          window.b2 = Array.from({length: C}, ()=> 0.0);
+        }
+      }
+    }catch(e){ console.warn('resizeOutputHead failed', e); }
+    // Clear minibatch buffers to avoid mixed-dimension targets
+    if (window.X_batch) window.X_batch.length = 0;
+    if (window.T_batch) window.T_batch.length = 0;
+    // Rebuild tables for new target set
+    if (typeof window.createTable === 'function') window.createTable();
+  };
 })();
 
 // Initialize dynamic table after assets load
