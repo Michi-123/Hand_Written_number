@@ -3,142 +3,108 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Hand written recognition — Mobile Ready</title>
+<title>Hand written recognition — Mobile + Tabs</title>
 <style>
-  :root {
-    --gap: 12px;
-    --pad: 12px;
-  }
+  :root { --gap: 12px; --pad: 12px; }
   html, body { height: 100%; }
-  body {
-    background: #f7f7f7;
-    margin: 0;
-    padding: var(--pad);
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
-    color: #222;
-  }
+  body { background: #f7f7f7; margin: 0; padding: var(--pad); font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color: #222; }
 
-  /* Toolbar */
-  .toolbar-table { width: 100%; border-collapse: collapse; margin-bottom: var(--gap); }
-  .toolbar-table td { padding: 8px; background: #eee; }
-  #toolbar { background: #e0e0e0; }
+  /* ===== Tabs ===== */
+  .tabs { display:flex; gap:8px; margin-bottom: var(--gap); }
+  .tabs button { flex: 1 1 0; border:1px solid #bbb; background:#fff; padding:10px 12px; border-radius:10px; font-size:16px; min-height:44px; }
+  .tabs button[aria-selected="true"] { background:#222; color:#fff; border-color:#222; }
 
-  /* Canvas + side panes */
-  .layout { display: grid; grid-template-columns: 1fr; gap: var(--gap); align-items: start; }
+  /* ===== Layout blocks ===== */
+  .toolbar { display:flex; gap:12px; flex-wrap:wrap; margin-bottom: var(--gap); }
+  .toolbar .block { background:#eee; padding:8px 10px; border-radius:10px; }
 
-  canvas {
-    background: #fff;
-    border: 1px solid #aaa;
-    border-radius: 8px;
-    width: min(92vw, 360px);   /* responsive display size */
-    height: auto;               /* keep aspect ratio */
-    touch-action: none;         /* prevent scroll while drawing */
-  }
+  .canvas-wrap { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
+  canvas { background:#fff; border:1px solid #aaa; border-radius: 8px; width:min(92vw, 360px); height:auto; touch-action:none; }
 
-  #predicted{
-    background-color: #fff;
-    border: solid 1px #ccc;
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    width: min(32vw, 160px);
-    height: min(32vw, 160px);
-    font-size: min(18vw, 72px);
-    margin: 6px 0;
-  }
+  .buttons-row { display:flex; flex-wrap:wrap; gap:8px; }
+  input[type="button"], input[type="range"], select, input[type="color"], input[type="text"], input[type="number"] { font-size:16px; }
+  input[type="button"], .btn { padding:10px 14px; border-radius:8px; border:1px solid #bbb; background:#fff; min-height:44px; }
+
+  /* Panels that existing JS reads by id are kept, we just toggle visibility by body class */
+  #label, #graph, #radio, #indicator { background:#fff; border:1px solid #ddd; border-radius:8px; padding:6px; }
+  #graph .bar_graph { background-color:#00cc00; height:12px; border-radius:6px; }
+  table { border-collapse: collapse; }
+  td.cell { text-align:center; padding:4px 6px; }
+
+  #predicted{ background:#fff; border:1px solid #ccc; border-radius:8px; display:flex; align-items:center; justify-content:center; width:min(32vw,160px); height:min(32vw,160px); font-size:min(18vw,72px); margin:6px 0; }
   #hypothesis { min-height: 24px; }
 
-  /* Buttons & inputs = larger tap targets */
-  input[type="button"], input[type="range"], select, input[type="color"], #learning_rate, #epoch {
-    font-size: 16px; /* avoid iOS zoom */
-  }
-  input[type="button"], #predict, #clear_canvas, #train_btn, #add_btn, #init_weights, #clear_batch {
-    padding: 10px 14px; border-radius: 8px; border: 1px solid #bbb; background: #fff; min-height: 44px;
-  }
+  /* ===== Visibility by tab ===== */
+  /* Default to 推論 */
+  body.tab-infer #data-controls, body.tab-infer #train-controls, body.tab-infer #radio, body.tab-infer #label { display:none; }
+  body.tab-infer #canvas-row, body.tab-infer #infer-controls, body.tab-infer #graph { display:block; }
 
-  /* Tables that JS depends on keep their IDs, but we make them scrollable on small screens */
-  #label, #graph, #radio, #indicator { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 6px; }
-  #graph .bar_graph { background-color: #00cc00; height: 12px; border-radius: 6px; }
+  body.tab-data #train-controls, body.tab-data #infer-controls, body.tab-data #graph { display:none; }
+  body.tab-data #canvas-row, body.tab-data #data-controls, body.tab-data #radio, body.tab-data #label { display:block; }
+  /* On phones we still want label visible on Data tab */
+  @media (max-width: 720px){ body.tab-data #label { display: table !important; } }
 
-  /* Compact table look */
-  table { border-collapse: collapse; }
-  td.cell { text-align: center; padding: 4px 6px; }
+  body.tab-train #canvas-row, body.tab-train #data-controls, body.tab-train #infer-controls, body.tab-train #graph, body.tab-train #radio, body.tab-train #label, body.tab-train #predicted-wrap { display:none; }
+  body.tab-train #train-controls { display:block; }
 
-  /* Mobile layout */
-  @media (max-width: 720px) {
-    .toolbar-table td { display: block; width: 100%; }
-    .buttons-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* Button-level toggles */
+  body.tab-data #add_btn { display:inline-block; }
+  body.tab-data #predict { display:none; }
 
-    /* Focus on key UI for phones */
-    #label { display: none; }
-    /* #radio and #indicator default hidden already; keep hidden on phones. */
+  body.tab-infer #add_btn { display:none; }
+  body.tab-infer #predict { display:inline-block; }
 
-    /* Make slider full width */
-    #learning_rate_range { width: 100%; max-width: 420px; }
-  }
-
-  /* Desktop tweaks */
-  @media (min-width: 721px) {
-    .layout { grid-template-columns: auto auto auto auto auto; }
-    canvas { width: 280px; }
-    #predicted { width: 120px; height: 120px; font-size: 80px; }
-  }
+  /* Desktop grid for label/graph when visible */
+  .grid { display:grid; grid-template-columns: auto auto; gap:12px; align-items:start; }
+  @media (min-width: 921px){ .grid { grid-template-columns: auto auto auto; } }
 </style>
 </head>
-<body>
+<body class="tab-infer">
 
-<table class="toolbar-table">
-  <tr id="toolbar">
-    <td>
-      <label for="predict_type" style="display:block;font-size:14px;margin-bottom:4px;">種別</label>
-      <select id="predict_type">
-        <option value="0">数字</option>
-        <option value="1">アルファベット</option>
-        <option value="2">かな</option>
-        <option value="3">記号</option>
-      </select>
-    </td>
-    <td>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <label for="learning_rate" style="white-space:nowrap;">学習率</label>
-        <input id="learning_rate" value="0.1" inputmode="decimal" />
-        <input type="range" id="learning_rate_range" min="0" max="5" />
-      </div>
-    </td>
-    <td>
-      <label for="epoch" style="white-space:nowrap;">エポック</label>
+<!-- ===== Tab Header ===== -->
+<nav class="tabs" role="tablist" aria-label="モード選択">
+  <button class="tab-btn" data-tab="data" role="tab" aria-selected="false">データ作成</button>
+  <button class="tab-btn" data-tab="train" role="tab" aria-selected="false">学習</button>
+  <button class="tab-btn" data-tab="infer" role="tab" aria-selected="true">推論</button>
+</nav>
+
+<!-- ===== Shared toolbar (only some parts hidden on certain tabs) ===== -->
+<div class="toolbar">
+  <div class="block" id="type-block">
+    <label for="predict_type" style="display:block;font-size:14px;margin-bottom:4px;">種別</label>
+    <select id="predict_type">
+      <option value="0">数字</option>
+      <option value="1">アルファベット</option>
+      <option value="2">かな</option>
+      <option value="3">記号</option>
+    </select>
+  </div>
+
+  <div class="block" id="train-toolbar">
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <label for="learning_rate" style="white-space:nowrap;">学習率</label>
+      <input id="learning_rate" value="0.1" inputmode="decimal" />
+      <input type="range" id="learning_rate_range" min="0" max="5" />
+      <label for="epoch" style="white-space:nowrap; margin-left:12px;">エポック</label>
       <input id="epoch" value="1" inputmode="numeric" />
-    </td>
-    <td class="tab">
-      <label for="tab_softmax">ソフトマックス</label>
-      <input type="radio" name="tab" id="tab_softmax" value="softmax" checked />
-    </td>
-    <td class="tab">
-      <label for="tab_batch_size">バッチサイズ</label>
-      <input type="radio" name="tab" id="tab_batch_size" value="batch_size" />
-    </td>
-  </tr>
-</table>
-
-<form name="form1">
-  <div class="layout">
-    <!-- Column 1: Canvas -->
-    <div>
-      <canvas id="canvas" width="280" height="280"></canvas>
-      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <input type="color" id="color" value="#77cc77" aria-label="ペン色" />
-        <input type="button" id="predict" value="Predict" />
-        <input type="button" id="clear_canvas" value=" Clear " />
-      </div>
-
-      <div class="buttons-row" style="margin-top:6px;">
-        <input type="button" id="init_weights" value=" Init " />
-        <input type="button" id="clear_batch" value="Clr Bat" />
-        <input type="button" id="add_btn" value="  Add  " />
-        <input type="button" id="train_btn" value=" Train " />
-      </div>
     </div>
+  </div>
+</div>
 
-    <!-- Column 2: Labels (hidden on small screens but kept for JS) -->
+<!-- ===== Canvas Row (visible on データ作成 / 推論) ===== -->
+<div id="canvas-row">
+  <div class="canvas-wrap">
+    <canvas id="canvas" width="280" height="280"></canvas>
+    <div class="buttons-row">
+      <input type="color" id="color" value="#77cc77" aria-label="ペン色" />
+      <input type="button" id="add_btn" value="  Add  " />
+      <input type="button" id="predict" value="Predict" />
+      <input type="button" id="clear_canvas" value=" Clear " />
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:12px;">
+    <!-- Label & Radio for データ作成 -->
     <table id="label">
       <tr><td class="cell cellnum0">0</td></tr>
       <tr><td class="cell cellnum1">1</td></tr>
@@ -152,21 +118,6 @@
       <tr><td class="cell cellnum9">9</td></tr>
     </table>
 
-    <!-- Column 3: Graph (default visible) -->
-    <table id="graph">
-      <tr><td class="graph n0"></td></tr>
-      <tr><td class="graph n1"></td></tr>
-      <tr><td class="graph n2"></td></tr>
-      <tr><td class="graph n3"></td></tr>
-      <tr><td class="graph n4"></td></tr>
-      <tr><td class="graph n5"></td></tr>
-      <tr><td class="graph n6"></td></tr>
-      <tr><td class="graph n7"></td></tr>
-      <tr><td class="graph n8"></td></tr>
-      <tr><td class="graph n9"></td></tr>
-    </table>
-
-    <!-- Column 4: Radio (kept for JS; hidden by default) -->
     <table id="radio" style="display:none;">
       <tr><td><input type="radio" name="num" value="0" /></td></tr>
       <tr><td><input type="radio" name="num" value="1" /></td></tr>
@@ -180,32 +131,60 @@
       <tr><td><input type="radio" name="num" value="9" /></td></tr>
     </table>
 
-    <!-- Column 5: Indicator (kept for JS; hidden by default) -->
-    <table id="indicator" style="display:none;">
-      <tr><td class="indicator n0">&nbsp;</td></tr>
-      <tr><td class="indicator n1">&nbsp;</td></tr>
-      <tr><td class="indicator n2">&nbsp;</td></tr>
-      <tr><td class="indicator n3">&nbsp;</td></tr>
-      <tr><td class="indicator n4">&nbsp;</td></tr>
-      <tr><td class="indicator n5">&nbsp;</td></tr>
-      <tr><td class="indicator n6">&nbsp;</td></tr>
-      <tr><td class="indicator n7">&nbsp;</td></tr>
-      <tr><td class="indicator n8">&nbsp;</td></tr>
-      <tr><td class="indicator n9">&nbsp;</td></tr>
+    <!-- Graph for 推論 -->
+    <table id="graph">
+      <tr><td class="graph n0"></td></tr>
+      <tr><td class="graph n1"></td></tr>
+      <tr><td class="graph n2"></td></tr>
+      <tr><td class="graph n3"></td></tr>
+      <tr><td class="graph n4"></td></tr>
+      <tr><td class="graph n5"></td></tr>
+      <tr><td class="graph n6"></td></tr>
+      <tr><td class="graph n7"></td></tr>
+      <tr><td class="graph n8"></td></tr>
+      <tr><td class="graph n9"></td></tr>
     </table>
   </div>
+</div>
 
-  <div style="margin-top:8px; display:grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px;">
+<!-- ===== 推論固有の表示領域 ===== -->
+<div id="infer-controls" style="margin-top:8px; display:block;">
+  <div id="predicted-wrap" style="display:grid; grid-template-columns: auto 1fr; align-items:center; gap: 8px;">
     <span>Predict:</span>
     <div id="predicted"></div>
     <span>H:</span>
     <span id="hypothesis"> </span>
   </div>
   <span id="hypothesis_all" style="display:none"></span><br />
-  loss:<span id="loss"></span><br />
-</form>
+</div>
 
-<!-- Scripts -->
+<!-- ===== 学習固有の表示領域 ===== -->
+<div id="train-controls" style="display:none; margin-top:6px;">
+  <div class="buttons-row">
+    <input type="button" id="init_weights" value=" Init " />
+    <input type="button" id="clear_batch" value="Clr Bat" />
+    <input type="button" id="train_btn" value=" Train " />
+  </div>
+  <div style="margin-top:8px;">loss: <span id="loss"></span></div>
+</div>
+
+<form name="form1" style="display:none;"><!-- 互換目的で残す（必要ならJSが参照） --></form>
+
+<!-- ===== (kept) hidden indicator table for JS ===== -->
+<table id="indicator" style="display:none;">
+  <tr><td class="indicator n0">&nbsp;</td></tr>
+  <tr><td class="indicator n1">&nbsp;</td></tr>
+  <tr><td class="indicator n2">&nbsp;</td></tr>
+  <tr><td class="indicator n3">&nbsp;</td></tr>
+  <tr><td class="indicator n4">&nbsp;</td></tr>
+  <tr><td class="indicator n5">&nbsp;</td></tr>
+  <tr><td class="indicator n6">&nbsp;</td></tr>
+  <tr><td class="indicator n7">&nbsp;</td></tr>
+  <tr><td class="indicator n8">&nbsp;</td></tr>
+  <tr><td class="indicator n9">&nbsp;</td></tr>
+</table>
+
+<!-- ===== Scripts ===== -->
 <script src="canvas.js"></script>
 <script src="jquery.js"></script>
 <script src="data/cW1.js"></script>
@@ -220,35 +199,45 @@
 <script src="main.js"></script>
 
 <script>
-  // ===== Mobile drawing support (adds touch events; keeps existing JS intact) =====
+  // ===== Tabs behavior =====
   (function(){
-    if (!window.canvas) return; // canvas.js defines global `canvas` & `ctx`
+    const buttons = document.querySelectorAll('.tab-btn');
+    function setTab(name){
+      document.body.classList.remove('tab-data','tab-train','tab-infer');
+      document.body.classList.add('tab-'+name);
+      buttons.forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab===name)));
+    }
+    buttons.forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
+    setTab('infer'); // default
+  })();
+
+  // ===== Mobile drawing support (touch events) =====
+  (function(){
+    const cvs = document.getElementById('canvas');
+    if (!cvs) return;
 
     const toMouseLikeEvent = (e) => {
       const t = e.touches && e.touches[0] ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
-      return { clientX: t.clientX, clientY: t.clientY, target: canvas };
+      return { clientX: t.clientX, clientY: t.clientY, target: cvs };
     };
 
-    // Start drawing
-    canvas.addEventListener('touchstart', function(e){
+    cvs.addEventListener('touchstart', function(e){
       e.preventDefault();
-      window.drawing = true; // uses global from canvas.js
+      window.drawing = true;
       const p = toMouseLikeEvent(e);
       const rect = p.target.getBoundingClientRect();
       window.before_x = p.clientX - rect.left;
       window.before_y = p.clientY - rect.top;
     }, { passive: false });
 
-    // Draw while moving
-    canvas.addEventListener('touchmove', function(e){
+    cvs.addEventListener('touchmove', function(e){
       e.preventDefault();
       if (!window.drawing) return;
       const p = toMouseLikeEvent(e);
       if (typeof draw_canvas === 'function') draw_canvas(p);
     }, { passive: false });
 
-    // End drawing
-    canvas.addEventListener('touchend', function(e){
+    cvs.addEventListener('touchend', function(e){
       e.preventDefault();
       window.drawing = false;
     }, { passive: false });
