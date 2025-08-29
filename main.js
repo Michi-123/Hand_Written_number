@@ -19,7 +19,7 @@ $(function(){
   $('#clear_batch').click(    function(){clearBatch()})
   $('#add_btn').click(        function(){addCanvasData()})
   $('#init_weights').click(   function(){initWeights()})
-  $('#train_btn').click(      function(){train()})
+  $('#train_btn').click(      function(){clearLoss(); train()})
 
   $('#radio').find('input:first').attr('checked', true)
 })
@@ -266,16 +266,18 @@ function initWeights(){
     return
   }
 
-  //initConvWeights(cW1)
-  //initConvWeights(cW2)
-  //initConvBias(cb1)
-  //initConvBias(cb2)
-  //initW(W1)
-  //initW(b1)
+//  initConvWeights(cW1)
+//  initConvWeights(cW2)
+//  initConvBias(cb1)
+//  initConvBias(cb2)
+//  initW(W1)
+//  initW(b1)
   initW(W2)
   initBias(b2)
 }
 
 function log(n){ console.log(n) }
 
-
+function clearLoss(){
+    D.getElementById('loss').innerHTML = "-";
+}
