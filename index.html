@@ -61,7 +61,7 @@
 </style>
 </head>
 <body>
-V3
+ｖ４
 <div class="tabs" role="tablist" aria-label="handwrite tabs">
   <div class="tabbar">
     <button id="tab-data" role="tab" aria-controls="panel-data" aria-selected="true">データ作成</button>
@@ -82,7 +82,8 @@ V3
     <!-- Right: Tabs content -->
     <section>
       <!-- データ作成 / 学習 / 推論 の各パネル -->
-      $1
+      <div id="panel-data" class="panel" role="tabpanel" aria-labelledby="tab-data">
+        <h3 style="margin-top:0">データ作成</h3>
         <div class="row">
           <label class="inline">線色</label>
           <input type="color" id="pen_color" value="#ff7777"/>
@@ -174,7 +175,7 @@ V3
       tabs.forEach(u=>{
         const s = (u.btn===t.btn);
         document.querySelector(u.btn).setAttribute('aria-selected', s);
-        document.querySelector(u.panel).hidden = !s;
+        const p = document.querySelector(u.panel); if (p) p.hidden = !s;
       });
     });
   });
