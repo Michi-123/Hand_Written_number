@@ -49,6 +49,7 @@
   body.tab-data #canvas-row,
   body.tab-data #label,
   body.tab-data #radio,
+  body.tab-data #indicator,
   body.tab-data #type-block { display:block; }
   body.tab-data #infer-controls,
   body.tab-data #graph,
@@ -227,6 +228,11 @@
       document.body.classList.remove('tab-data','tab-train','tab-infer');
       document.body.classList.add('tab-'+name);
       buttons.forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab===name)));
+      // Dataタブに入ったときに、オリジナルの挙動どおり
+      // 種別に応じて #label / #radio / #indicator を再構築
+      if (name === 'data' && typeof changeLabel === 'function') {
+        try { changeLabel(); } catch (e) { console.warn(e); }
+      }
     }
     buttons.forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
     setTab('infer'); // default
