@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hand written recognition</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background: #f5f5f5;
+    margin: 0;
+    padding: 10px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}
+
+/* Tab Navigation */
+.tab-container {
+    display: flex;
+    background: #ddd;
+    border-radius: 5px 5px 0 0;
+    overflow: hidden;
+    margin-bottom: 0;
+}
+
+.tab-button {
+    flex: 1;
+    padding: 12px 8px;
+    background: #ddd;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s;
+}
+
+.tab-button.active {
+    background: #fff;
+    font-weight: bold;
+}
+
+.tab-button:hover {
+    background: #ccc;
+}
+
+/* Tab Content */
+.tab-content {
+    display: none;
+    background: #fff;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 0 0 5px 5px;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Canvas Styling */
+#canvas {
+    display: block;
+    margin: 15px auto;
+    background: #ffffff;
+    border: 2px solid #aaa;
+    border-radius: 5px;
+    max-width: 100%;
+    width: 280px;
+    height: 280px;
+    touch-action: none;
+}
+
+/* Control Groups */
+.control-group {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 5px;
+}
+
+.control-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.control-row:last-child {
+    margin-bottom: 0;
+}
+
+/* Buttons */
+button, input[type="button"] {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    min-width: 60px;
+}
+
+button:hover, input[type="button"]:hover {
+    background: #f0f0f0;
+}
+
+button.primary {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+button.primary:hover {
+    background: #0056b3;
+}
+
+/* Form Elements */
+select, input[type="color"], input[type="range"], input[type="text"] {
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+input[type="color"] {
+    width: 40px;
+    height: 32px;
+    padding: 2px;
+    cursor: pointer;
+}
+
+input[type="range"] {
+    flex: 1;
+    min-width: 100px;
+}
+
+#learning_rate, #epoch {
+    width: 50px;
+    text-align: center;
+}
+
+/* Results Table */
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: #fff;
+}
+
+.results-table th, .results-table td {
+    padding: 8px 4px;
+    border: 1px solid #ddd;
+    text-align: center;
+    font-size: 12px;
+}
+
+.results-table th {
+    background: #f8f9fa;
+    font-weight: bold;
+}
+
+.results-table tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+/* Radio buttons in table */
+.results-table input[type="radio"] {
+    margin: 0;
+    transform: scale(1.2);
+}
+
+/* Graph bars */
+.bar_graph {
+    background-color: #00cc00;
+    height: 20px;
+    border-radius: 2px;
+    display: inline-block;
+    min-width: 1px;
+}
+
+.graph-cell {
+    min-width: 100px;
+    padding: 4px !important;
+}
+
+/* Prediction Results */
+.prediction-results {
+    margin-top: 20px;
+    text-align: center;
+}
+
+#predicted {
+    background-color: #fff;
+    width: 80px;
+    height: 80px;
+    line-height: 80px;
+    text-align: center;
+    font-size: 48px;
+    font-weight: bold;
+    border: 2px solid #007bff;
+    border-radius: 8px;
+    margin: 10px auto;
+    color: #007bff;
+}
+
+.result-info {
+    margin: 10px 0;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    body {
+        padding: 5px;
+    }
+    
+    .tab-button {
+        font-size: 11px;
+        padding: 10px 4px;
+    }
+    
+    .control-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .control-row > * {
+        margin-bottom: 5px;
+    }
+    
+    #canvas {
+        width: min(280px, calc(100vw - 40px));
+        height: min(280px, calc(100vw - 40px));
+    }
+    
+    .results-table {
+        font-size: 11px;
+    }
+    
+    .results-table th, .results-table td {
+        padding: 6px 2px;
+    }
+    
+    #predicted {
+        width: 60px;
+        height: 60px;
+        line-height: 60px;
+        font-size: 36px;
+    }
+}
+
+@media (max-width: 480px) {
+    .tab-button {
+        font-size: 10px;
+        padding: 8px 2px;
+    }
+    
+    button, input[type="button"] {
+        font-size: 11px;
+        padding: 6px 8px;
+        min-width: 50px;
+    }
+}
+
+/* Hide elements that were originally hidden */
+#radio_hidden, #indicator_hidden {
+    display: none;
+}
+</style>
+</head>
+<body>
+
+<!-- Tab Navigation -->
+<div class="tab-container">
+    <button class="tab-button active" onclick="showTab('data-creation')">データ作成</button>
+    <button class="tab-button" onclick="showTab('training')">学習</button>
+    <button class="tab-button" onclick="showTab('prediction')">推論</button>
+</div>
+
+<!-- Data Creation Tab -->
+<div id="data-creation" class="tab-content active">
+    <div class="control-group">
+        <div class="control-row">
+            <label>種類:</label>
+            <select id="predict_type">
+                <option value="0">数字</option>
+                <option value="1">アルファベット</option>
+                <option value="2">かな</option>
+                <option value="3">記号</option>
+            </select>
+        </div>
+        <div class="control-row">
+            <label>色:</label>
+            <input type="color" id="color" value="#ff7777">
+            <button class="clear_canvas">Clear</button>
+            <button id="clear_batch">Clr Bat</button>
+            <button id="add_btn" class="primary">Add</button>
+        </div>
+    </div>
+</div>
+
+<!-- Training Tab -->
+<div id="training" class="tab-content">
+    <div class="control-group">
+        <div class="control-row">
+            <label>学習率:</label>
+            <input id="learning_rate" value="0.1">
+            <input type="range" id="learning_rate_range" min="0" max="5" value="3">
+        </div>
+        <div class="control-row">
+            <label>エポック:</label>
+            <input id="epoch" value="1">
+        </div>
+        <div class="control-row">
+            <button id="init_weights">Init Weight</button>
+            <button id="train_btn" class="primary">Train</button>
+        </div>
+    </div>
+    
+    <div class="result-info">
+        損失: <span id="loss">-</span>
+    </div>
+</div>
+
+<!-- Prediction Tab -->
+<div id="prediction" class="tab-content">
+    <div class="control-group">
+        <div class="control-row">
+            <label>色:</label>
+            <input type="color" id="color2" value="#77cc77">
+            <button class="clear_canvas">Clear</button>
+            <button id="predict" class="primary">Predict</button>
+        </div>
+    </div>
+    
+    <div class="prediction-results">
+        <div>予測結果:</div>
+        <div id="predicted"></div>
+        <div class="result-info">
+            強さ: <span id="hypothesis"></span>
+        </div>
+        <span id="hypothesis_all" style="display:none"></span>
+    </div>
+</div>
+
+<!-- Canvas (shared across tabs) -->
+<canvas id="canvas" width="280" height="280"></canvas>
+
+<!-- Results Table (shared across tabs) -->
+<table class="results-table" id="results_table">
+    <thead>
+        <tr>
+            <th>選択</th>
+            <th>文字</th>
+            <th>確率グラフ</th>
+            <th>データ数</th>
+        </tr>
+    </thead>
+    <tbody id="results_tbody">
+        <!-- Table rows will be generated by JavaScript -->
+    </tbody>
+</table>
+
+<!-- Hidden elements for compatibility -->
+<div id="radio_hidden" style="display:none">
+    <table id="radio" border=1></table>
+</div>
+<div id="indicator_hidden" style="display:none">
+    <table id="indicator" border=1></table>
+</div>
+
+<script>
+// Tab functionality
+function showTab(tabName) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => content.classList.remove('active'));
+    
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => button.classList.remove('active'));
+    
+    // Show selected tab
+    document.getElementById(tabName).classList.add('active');
+    
+    // Activate corresponding button
+    event.target.classList.add('active');
+    
+    // Clear canvas when switching tabs
+    clearCanvas();
+    clearGraph();
+}
+
+// Global variables (from original code)
+var CANVAS_WIDTH = 280;
+var CANVAS_HEIGHT = 280;
+var D = document;
+var drawing = false;
+var before_x = 0;
+var before_y = 0;
+var canvas, ctx;
+var X_batch = [];
+var T_batch = [];
+
+var t_number = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+var t_alphabet = ['A','B','C','D','E','F','G','H','I','J'];
+var t_kana = ['い','ろ','は','に','ほ','へ','と'];
+var t_sign = ['◯','×','△','◎','☆'];
+var target = t_number;
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+    
+    // Add touch support for mobile
+    canvas.addEventListener('mousemove', draw_canvas);
+    canvas.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousemove', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+    });
+    
+    canvas.addEventListener('mousedown', function(e) {
+        drawing = true;
+        var rect = e.target.getBoundingClientRect();
+        before_x = e.clientX - rect.left;
+        before_y = e.clientY - rect.top;
+    });
+    
+    canvas.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = e.target.getBoundingClientRect();
+        drawing = true;
+        before_x = touch.clientX - rect.left;
+        before_y = touch.clientY - rect.top;
+    });
+    
+    canvas.addEventListener('mouseup', function() {
+        drawing = false;
+    });
+    
+    canvas.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        drawing = false;
+    });
+    
+    // Event listeners
+    document.getElementById('predict_type').addEventListener('change', function() {
+        clearCanvas();
+        changeLabel();
+    });
+    
+    document.getElementById('learning_rate_range').addEventListener('change', function() {
+        setLearningRate(this);
+    });
+    
+    document.getElementById('predict').addEventListener('click', function() {
+        predict();
+    });
+    
+    document.querySelectorAll('.clear_canvas').forEach(btn => {
+        btn.addEventListener('click', function() {
+            clearCanvas();
+            clearGraph();
+        });
+    });
+    
+    document.getElementById('clear_batch').addEventListener('click', function() {
+        clearBatch();
+    });
+    
+    document.getElementById('add_btn').addEventListener('click', function() {
+        addCanvasData();
+    });
+    
+    document.getElementById('init_weights').addEventListener('click', function() {
+        initWeights();
+    });
+    
+    document.getElementById('train_btn').addEventListener('click', function() {
+        train();
+    });
+    
+    // Initialize table
+    createTable();
+    
+    // Set first radio button as checked
+    setTimeout(() => {
+        const firstRadio = document.querySelector('input[name="num"]');
+        if (firstRadio) firstRadio.checked = true;
+    }, 100);
+});
+
+// Drawing function
+function draw_canvas(e) {
+    if (!drawing) return;
+    
+    var rect = e.target.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var y = e.clientY - rect.top;
+    var color = document.getElementById('color').value;
+    
+    // Use color2 if in prediction tab
+    const activeTab = document.querySelector('.tab-content.active');
+    if (activeTab && activeTab.id === 'prediction') {
+        color = document.getElementById('color2').value;
+    }
+    
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.moveTo(before_x, before_y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.closePath();
+    
+    before_x = x;
+    before_y = y;
+}
+
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.getElementById('predicted').innerHTML = "";
+    document.getElementById('hypothesis').innerHTML = "";
+}
+
+function clearGraph() {
+    const graphCells = document.querySelectorAll('.graph-cell');
+    graphCells.forEach(cell => cell.innerHTML = "");
+}
+
+function changeLabel() {
+    clearGraph();
+    clearIndicators();
+    
+    var v = document.getElementById('predict_type').value;
+    
+    switch (v) {
+        case "0":
+            target = t_number;
+            break;
+        case "1":
+            target = t_alphabet;
+            break;
+        case "2":
+            target = t_kana;
+            break;
+        case "3":
+            target = t_sign;
+            break;
+        default:
+            target = [];
+    }
+    
+    createTable();
+}
+
+function createTable() {
+    const tbody = document.getElementById('results_tbody');
+    tbody.innerHTML = '';
+    
+    // Also update hidden tables for compatibility
+    const radioTable = document.getElementById('radio');
+    const indicatorTable = document.getElementById('indicator');
+    radioTable.innerHTML = '';
+    indicatorTable.innerHTML = '';
+    
+    for (let i = 0; i < target.length; i++) {
+        // Main visible table row
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <input type="radio" name="num" value="${i}">
+            </td>
+            <td class="cell cellnum${i}">${target[i]}</td>
+            <td class="graph-cell">
+                <div class="graph n${i}"></div>
+            </td>
+            <td class="indicator-cell">
+                <div class="indicator n${i}">&nbsp;</div>
+            </td>
+        `;
+        tbody.appendChild(row);
+        
+        // Hidden tables for compatibility
+        const radioRow = document.createElement('tr');
+        radioRow.innerHTML = `<td><input type="radio" name="num" value="${i}"></td>`;
+        radioTable.appendChild(radioRow);
+        
+        const indicatorRow = document.createElement('tr');
+        indicatorRow.innerHTML = `<td class="indicator n${i}">&nbsp;</td>`;
+        indicatorTable.appendChild(indicatorRow);
+    }
+    
+    // Set first radio button as checked
+    const firstRadio = document.querySelector('input[name="num"]');
+    if (firstRadio) firstRadio.checked = true;
+}
+
+function clearIndicators() {
+    const indicators = document.querySelectorAll('.indicator');
+    indicators.forEach(indicator => indicator.innerHTML = '&nbsp;');
+}
+
+function setLearningRate(element) {
+    var v = element.value;
+    var learningRate = 0.1;
+    
+    switch (parseInt(v)) {
+        case 0: learningRate = 0.9; break;
+        case 1: learningRate = 0.5; break;
+        case 2: learningRate = 0.2; break;
+        case 3: learningRate = 0.1; break;
+        case 4: learningRate = 0.05; break;
+        case 5: learningRate = 0.01; break;
+    }
+    
+    document.getElementById('learning_rate').value = learningRate;
+}
+
+function drawSoftmaxGraph(h) {
+    if (!h || h.length === 0) return;
+    
+    // Simple softmax calculation
+    const max = Math.max(...h);
+    const exp = h.map(x => Math.exp(x - max));
+    const sum = exp.reduce((a, b) => a + b, 0);
+    const softmax = exp.map(x => x / sum);
+    
+    clearGraph();
+    
+    for (let i = 0; i < softmax.length; i++) {
+        const element = document.querySelector(`.graph.n${i}`);
+        if (element) {
+            const width = Math.max(1, parseInt(softmax[i] * 200));
+            element.innerHTML = `<div class="bar_graph" style="width:${width}px">&nbsp;</div>`;
+        }
+    }
+}
+
+function clearBatch() {
+    if (!confirm("バッチデータをクリアしますか？")) return;
+    
+    X_batch = [];
+    T_batch = [];
+    clearIndicators();
+}
+
+function addCanvasData() {
+    const selectedRadio = document.querySelector('input[name="num"]:checked');
+    if (!selectedRadio) return;
+    
+    const num = selectedRadio.value;
+    const indicator = document.querySelector(`.indicator.n${num}`);
+    
+    if (indicator) {
+        indicator.innerHTML += String.fromCharCode(9609);
+    }
+    
+    const idx = parseInt(num);
+    const t = new Array(target.length).fill(0);
+    t[idx] = 1;
+    
+    X_batch.push(getCanvasData());
+    T_batch.push(t);
+    
+    clearCanvas();
+}
+
+function getCanvasData() {
+    const imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    const data = imageData.data;
+    const block = [];
+    const channel = [];
+    const steps = 10;
+    
+    for (let i = 0; i < CANVAS_HEIGHT; i += steps) {
+        const rowData = [];
+        for (let j = 0; j < CANVAS_WIDTH - 1; j += steps) {
+            const opacity = data[(j * 4 + 3) + (i * CANVAS_WIDTH * 4)];
+            const pixel = opacity > 256 / 2 ? 1 : 0;
+            rowData.push(pixel);
+        }
+        channel.push(rowData);
+    }
+    
+    block.push(channel);
+    return block;
+}
+
+// Dummy implementations for missing functions
+function predict() {
+    console.log('Predict function called');
+    document.getElementById('predicted').textContent = target[Math.floor(Math.random() * target.length)];
+    document.getElementById('hypothesis').textContent = (Math.random()).toFixed(3);
+    
+    // Generate dummy data for graph
+    const dummyH = target.map(() => Math.random() * 2 - 1);
+    drawSoftmaxGraph(dummyH);
+}
+
+function train() {
+    if (X_batch.length === 0) {
+        alert('訓練データがありません。まずデータを追加してください。');
+        return;
+    }
+    console.log('Train function called');
+    document.getElementById('loss').textContent = (Math.random() * 0.5).toFixed(4);
+}
+
+function initWeights() {
+    if (!confirm("Are you sure initialize Weights?")) return;
+    console.log('Initialize weights');
+}
+</script>
+
+</body>
+</html>
