@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="generator" content="a-blog cms for basic" />
+<title>Hand written recognition</title>
+<style>
+body {
+   background: #eee;
+   margin-left: 10px;
+   margin-top: 10px;
+}
+
+#toolbar{
+	background-color: #ccc
+}
+
+canvas {
+   margin: 10px;
+   background: #ffffff;
+   border: 1px solid #aaaaaa;
+}
+
+input[type="image"]{
+	padding: 2px;
+	outline: none;
+}
+
+input[type="image"].active{
+	background-color: #fff;
+}
+
+.cell{
+	text-align: center;
+}
+
+#radio{
+	display: none;
+}
+#indicator{
+	display: none;
+}
+
+.indicator{
+	width: 0px;
+	color: #f99;
+}
+
+#predicted{
+  background-color: #fff;
+  width: 120px;
+  height: 120px;
+  text-align: center;
+  font-size: 80px;
+  border: solid 1px #ccc;
+  margin: 0px; 
+}
+
+#hypothesis{
+  height: 40px;
+}
+
+#add_btn, #train_btn{
+}
+
+.bar_graph{
+	background-color: #00cc00
+}
+
+input[name=radio]{
+	width:0;
+}
+
+#predict_type{
+	font-size: 18px	
+}
+
+#learning_rate{
+	font-size: 18px;
+	width: 40px;
+	text-align: right;
+}
+
+#epoch{
+	font-size: 18px;
+	width: 30px;
+	text-align: right;
+}
+
+#tab>input{
+	border: solid #555;
+}
+
+</style>
+</head>
+
+<body>
+
+<table border=1>
+	<tr id="toolbar">
+		<td>
+			<select id="predict_type">
+			  <option value="0">数字
+			  <option value="1">アルファベット
+			  <option value="2">かな
+			  <option value="3">記号
+			</select>
+		</td>
+		<td>
+			学習率<input id="learning_rate" value="0.1">
+			<input type="range" id="learning_rate_range" min="0" max="5">
+		</td>
+		<td>
+			エポック<input id="epoch" value="1">
+		</td>
+
+		<td class="tab">
+			<label for="tab_softmax">ソフトマックス</label>
+			<input type="radio" name="tab" id="tab_softmax" value="softmax" checked>
+		</td>
+
+		<td class="tab">
+			<label for="tab_batch_size">バッチサイズ</label>
+			<input type="radio" name="tab" id="tab_batch_size" value="batch_size" >
+		</td>
+
+	</tr>
+</table>
+
+<form name="form1">
+	<table>
+		<tr>
+			<td>
+        		<canvas id="canvas" width="280" height="280"></canvas><br>
+      		</td>
+
+			<td>
+				<table id="label">
+					<tr><td class="cell cellnum0">0
+					<tr><td class="cell cellnum1">1
+					<tr><td class="cell cellnum2">2
+					<tr><td class="cell cellnum3">3
+					<tr><td class="cell cellnum4">4
+					<tr><td class="cell cellnum5">5
+					<tr><td class="cell cellnum6">6
+					<tr><td class="cell cellnum7">7
+					<tr><td class="cell cellnum8">8
+					<tr><td class="cell cellnum9">9
+				</table>
+			</td>
+
+			<td>
+				<table id="graph">
+					<tr>
+						<tr><td class="graph n0">
+						<tr><td class="graph n1">
+						<tr><td class="graph n2">
+						<tr><td class="graph n3">
+						<tr><td class="graph n4">
+						<tr><td class="graph n5">
+						<tr><td class="graph n6">
+						<tr><td class="graph n7">
+						<tr><td class="graph n8">
+						<tr><td class="graph n9">
+					</tr>
+				</table>
+			</td>
+
+			<td>
+				<table id="radio">
+					<tr><td><input type="radio" name="num" value="0">
+					<tr><td><input type="radio" name="num" value="1">
+					<tr><td><input type="radio" name="num" value="2">
+					<tr><td><input type="radio" name="num" value="3">
+					<tr><td><input type="radio" name="num" value="4">
+					<tr><td><input type="radio" name="num" value="5">
+					<tr><td><input type="radio" name="num" value="6">
+					<tr><td><input type="radio" name="num" value="7">
+					<tr><td><input type="radio" name="num" value="8">
+					<tr><td><input type="radio" name="num" value="9">
+				</table>
+			</td>
+
+			<td>
+				<table id="indicator">
+					<tr><td class="indicator n0">&nbsp;
+					<tr><td class="indicator n1">&nbsp;
+					<tr><td class="indicator n2">&nbsp;
+					<tr><td class="indicator n3">&nbsp;
+					<tr><td class="indicator n4">&nbsp;
+					<tr><td class="indicator n5">&nbsp;
+					<tr><td class="indicator n6">&nbsp;
+					<tr><td class="indicator n7">&nbsp;
+					<tr><td class="indicator n8">&nbsp;
+					<tr><td class="indicator n9">&nbsp;
+				</table>
+			</td>
+
+    	</tr>
+    	<tr>
+	      	<td>
+				<input type="color"  id="color"    value="#77cc77">
+				<input type="button" id="predict"  value="Predict">
+				<input type="button" id="clear_canvas"   value=" Clear ">
+			</td>
+	  	</tr>
+    	<tr>
+	      	<td>
+		        <input type="button" id="init_weights" 	value=" Init ">
+		        <input type="button" id="clear_batch" 	value="Clr Bat">
+		        <input type="button" id="add_btn" 		value="  Add  ">
+				<input type="button" id="train_btn" 	value=" Train ">
+			</td>
+	  	</tr>
+	  </table>
+
+Predict: <div id="predicted"></div>
+H:<span id="hypothesis"> </span><br>
+<span id="hypothesis_all" style="display:none"></span><br>
+loss:<span id="loss"></span><br>
+</form>
+
+<script type="text/javascript" src="canvas.js"></script>
+
+<script type="text/javascript" src="jquery.js"></script>
+<script type="text/javascript" src="data/cW1.js"></script>
+<script type="text/javascript" src="data/cW2.js"></script>
+<script type="text/javascript" src="data/cb1.js"></script>
+<script type="text/javascript" src="data/cb2.js"></script>
+<script type="text/javascript" src="data/W1.js"></script>
+<script type="text/javascript" src="data/b1.js"></script>
+<script type="text/javascript" src="data/W2.js"></script>
+<script type="text/javascript" src="data/b2.js"></script>
+
+<script type="text/javascript" src="network.js"></script>
+<script type="text/javascript" src="main.js"></script>
+
+
+</body>
+</html>
