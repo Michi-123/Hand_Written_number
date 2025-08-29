@@ -47,9 +47,9 @@
 
   /* Classes table (horizontal like table1) */
   .classes-wrap{overflow:auto}
-  table#classes{width:100%;border-collapse:collapse}
-  table#classes td, table#classes th{border-bottom:1px solid var(--line);padding:8px}
-  table#classes tr:hover{background:#13161c}
+  table#classes_data, table#classes_pred{width:100%;border-collapse:collapse}
+  table#classes_data td, table#classes_pred td, table#classes_data th, table#classes_pred th{border-bottom:1px solid var(--line);padding:8px}
+  table#classes_data tr:hover, table#classes_pred tr:hover{background:#13161c}
   td.cell{width:42px;text-align:center;font-weight:700}
   td.graph{min-width:160px}
   .bar{height:12px;background:var(--ok);border-radius:6px}
@@ -61,6 +61,7 @@
 </style>
 </head>
 <body>
+
 <div class="tabs" role="tablist" aria-label="handwrite tabs">
   <div class="tabbar">
     <button id="tab-data" role="tab" aria-controls="panel-data" aria-selected="true">データ作成</button>
@@ -73,7 +74,7 @@
   <div class="workspace">
     <!-- Left: Canvas -->
     <section class="panel">
-      <h3 style="margin-top:0">手書き入力4</h3>
+      <h3 style="margin-top:0">手書き入力５</h3>
       <canvas id="canvas" width="280" height="280"></canvas>
       
     </section>
@@ -104,7 +105,7 @@
           <button class="btn" id="clear_batch">Clr Bat</button>
         </div>
         <div class="classes-wrap" style="margin-top:8px">
-          <table id="classes"><!-- JSで行を生成 --></table>
+          <table id="classes_data"><!-- JSで行を生成 --></table>
         </div>
       </div>
 
@@ -138,8 +139,10 @@
           </div>
           <div style="margin-left:18px;min-width:200px">
             <div style="font-size:12px;color:var(--muted);margin-bottom:6px">強さ</div>
-            <div id="hypothesis">&nbsp;</div>
-          </div>
+            $1
+            <div class="classes-wrap" style="margin-top:8px">
+              <table id="classes_pred"><!-- JSで行を生成 --></table>
+            </div>
         </div>
       </div>
     </section>
@@ -235,25 +238,39 @@
   }
 })();
 
-// ---- Horizontal classes table generator (replaces #table2 vertical layout) ----
-// Override createTable() from main.js
+// ---- Tables generator: split for Data (作成) and Inference (推論) ----
 (function(){
-  function createHorizontalTable(){
-    const table = $('#classes');
+  function createDataTable(){
+    const table = $('#classes_data');
+    if(!table.length) return;
     table.empty();
-    for(let i=0; i<target.length; i++){
+    for(let i=0;i<target.length;i++){
       const row = $(`
         <tr>
           <td class="radio_button"><input type="radio" name="num" value="${i}" ${i===0?'checked':''}></td>
           <td class="cell cellnum${i}">${target[i]}</td>
-          <td class="graph n${i}"></td>
           <td class="indicator n${i}">&nbsp;</td>
         </tr>`);
       table.append(row);
     }
   }
-  // Replace global createTable
-  window.createTable = createHorizontalTable;
+  function createPredTable(){
+    const table = $('#classes_pred');
+    if(!table.length) return;
+    table.empty();
+    for(let i=0;i<target.length;i++){
+      const row = $(`
+        <tr>
+          <td class="cell cellnum${i}">${target[i]}</td>
+          <td class="graph n${i}"></td>
+        </tr>`);
+      table.append(row);
+    }
+  }
+  window.createTable = function(){
+    createDataTable();
+    createPredTable();
+  };
 })();
 
 // ---- Update drawSoftmaxGraph & addCanvasData selectors to new table ----
@@ -263,17 +280,17 @@
   window.drawSoftmaxGraph = function(h){
     const s = softmax(h);
     // clear
-    $('#classes .graph').html('');
+    $('#classes_pred .graph').html('');
     for(let i=0; i<s.length; i++){
       const px = Math.max(1, Math.floor(s[i]*300));
-      $('#classes .graph.n'+i).html(`<div class="bar" style="width:${px}px"></div>`);
+      $('#classes_pred .graph.n'+i).html(`<div class="bar" style="width:${px}px"></div>`);
     }
   };
 
   const _addCanvasData = window.addCanvasData;
   window.addCanvasData = function(){
     const num = $('input[name=num]:checked').val();
-    const el = $('#classes .indicator.n'+num);
+    const el = $('#classes_data .indicator.n'+num);
     const t = (el.text()||'') + String.fromCharCode(9609);
     el.text(t);
 
@@ -288,7 +305,7 @@
 
 // ---- Clear buttons bind (works with original .clear_canvas handler in main.js) ----
 (function(){
-  $('.clear_canvas').on('click', function(){ try{ clearCanvas(); }catch(e){} $('#classes .graph').empty(); });
+  $('.clear_canvas').on('click', function(){ try{ clearCanvas(); }catch(e){} $('#classes_pred .graph').empty(); }); }catch(e){} $('#classes_pred .graph').empty(); });
 })();
 
 // Initialize dynamic table after assets load
