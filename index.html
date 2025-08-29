@@ -56,7 +56,7 @@
   td.indicator{color:#f99;white-space:nowrap}
 
   /* Result area */
-  #predicted{background:#fff;color:#222;width:120px;height:120px;text-align:center;font-size:80px;border:1px solid #ccc;border-radius:8px;display:flex;align-items:center;justify-content:center}
+  #predicted{background:#fff;color:#222;width:70px;height:70px;text-align:center;font-size:60px;border:1px solid #ccc;border-radius:10px;display:flex;align-items:center;justify-content:center}
   #hypothesis{min-height:24px;color:var(--muted)}
 </style>
 </head>
@@ -74,7 +74,7 @@
   <div class="workspace">
     <!-- Left: Canvas -->
     <section class="panel">
-      <h3 style="margin-top:0">手書き入力8</h3>
+      <h3 style="margin-top:0">手書き入力9</h3>
       <canvas id="canvas" width="280" height="280"></canvas>
       
     </section>
@@ -83,15 +83,7 @@
     <section>
       <!-- データ作成 / 学習 / 推論 の各パネル -->
       <div id="panel-data" class="panel" role="tabpanel" aria-labelledby="tab-data">
-        <h3 style="margin-top:0">データ作成</h3>
         <div class="row">
-          <label class="inline">線色</label>
-          <input type="color" id="pen_color" value="#ff7777"/>
-          <input type="color" id="color" value="#ff7777" style="display:none"/>
-          <button class="btn clear_canvas">Clear</button>
-          <button class="btn" id="add_btn">Add</button>
-        </div>
-        <div class="row" style="margin-top:8px">
           <label class="inline">種別</label>
           <select id="predict_type">
             <option value="0">数字</option>
@@ -99,10 +91,9 @@
             <option value="2">かな</option>
             <option value="3">記号</option>
           </select>
-        </div>
-
-        <div class="row">
-          <button class="btn" id="clear_batch">Clr Bat</button>
+          <button class="btn clear_canvas">消す</button>
+          <button class="btn" id="add_btn">追加</button>
+          <button class="btn" id="clear_batch">消去</button>
         </div>
         <div class="classes-wrap" style="margin-top:8px">
           <table id="classes_data"><!-- JSで行を生成 --></table>
@@ -117,8 +108,8 @@
           <input type="range" id="learning_rate_range" min="0" max="5">
           <label class="inline">エポック</label>
           <input id="epoch" value="1" style="width:60px;text-align:right">
-          <button class="btn" id="init_weights">Init</button>
-          <button class="btn ok" id="train_btn">Train</button>
+          <button class="btn" id="init_weights">初期化</button>
+          <button class="btn ok" id="train_btn">学習</button>
         </div>
         <div class="row" style="margin-top:8px">
           <label class="inline">損失:</label>
@@ -127,23 +118,42 @@
       </div>
 
       <div id="panel-infer" class="panel" role="tabpanel" hidden aria-labelledby="tab-infer">
-        <h3 style="margin-top:0">推論</h3>
-        <div class="row">
-          <button class="btn ok" id="predict">Predict</button>
-          <button class="btn clear_canvas">Clear</button>
-        </div>
-        <div class="row" style="margin-top:12px">
+        <table>
+        <tr>
+        
+        <td>
           <div>
             <div style="font-size:12px;color:var(--muted);margin-bottom:6px">予測結果</div>
             <div id="predicted">&nbsp;</div>
           </div>
+        </td>
+
+        <td>
+          <div class="row">
+            <input type="color" id="pen_color" value="#00cc00"/>
+            <input type="color" id="color" value="#00cc00" style="display:none"/>
+            <br>
+            <button class="btn ok" id="predict">予測</button>
+            <button class="btn clear_canvas">消す</button>
+          </div>
+        </td>
+        </tr>
+        </table>
+
+        <table>
+        <tr>
+        <div class="row" style="margin-top:12px">
           <div style="margin-left:18px;min-width:200px">
             <div style="font-size:12px;color:var(--muted);margin-bottom:6px">強さ</div>
             <div id="hypothesis" style="display:none"></div>
+
             <div class="classes-wrap" style="margin-top:8px">
               <table id="classes_pred"><!-- JSで行を生成 --></table>
             </div>
         </div>
+        
+        </tr>
+        </table>
       </div>
     </section>
   </div>
