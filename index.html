@@ -36,23 +36,44 @@
 
   /* ===== Visibility by tab ===== */
   /* Default to 推論 */
-  body.tab-infer #data-controls, body.tab-infer #train-controls, body.tab-infer #radio, body.tab-infer #label { display:none; }
-  body.tab-infer #canvas-row, body.tab-infer #infer-controls, body.tab-infer #graph { display:block; }
+  body.tab-infer #canvas-row,
+  body.tab-infer #infer-controls,
+  body.tab-infer #graph { display:block; }
+  body.tab-infer #train-controls,
+  body.tab-infer #label,
+  body.tab-infer #radio,
+  body.tab-infer #type-block,
+  body.tab-infer #train-toolbar { display:none; }
 
-  body.tab-data #train-controls, body.tab-data #infer-controls, body.tab-data #graph { display:none; }
-  body.tab-data #canvas-row, body.tab-data #data-controls, body.tab-data #radio, body.tab-data #label { display:block; }
-  /* On phones we still want label visible on Data tab */
+  /* データ作成 */
+  body.tab-data #canvas-row,
+  body.tab-data #label,
+  body.tab-data #radio,
+  body.tab-data #type-block { display:block; }
+  body.tab-data #infer-controls,
+  body.tab-data #graph,
+  body.tab-data #train-controls,
+  body.tab-data #train-toolbar { display:none; }
   @media (max-width: 720px){ body.tab-data #label { display: table !important; } }
 
-  body.tab-train #canvas-row, body.tab-train #data-controls, body.tab-train #infer-controls, body.tab-train #graph, body.tab-train #radio, body.tab-train #label, body.tab-train #predicted-wrap { display:none; }
-  body.tab-train #train-controls { display:block; }
+  /* 学習 */
+  body.tab-train #train-controls,
+  body.tab-train #train-toolbar { display:block; }
+  body.tab-train #canvas-row,
+  body.tab-train #infer-controls,
+  body.tab-train #graph,
+  body.tab-train #radio,
+  body.tab-train #label,
+  body.tab-train #predicted-wrap,
+  body.tab-train #type-block { display:none; }
 
   /* Button-level toggles */
   body.tab-data #add_btn { display:inline-block; }
   body.tab-data #predict { display:none; }
-
   body.tab-infer #add_btn { display:none; }
   body.tab-infer #predict { display:inline-block; }
+  body.tab-train #add_btn,
+  body.tab-train #predict { display:none; }
 
   /* Desktop grid for label/graph when visible */
   .grid { display:grid; grid-template-columns: auto auto; gap:12px; align-items:start; }
