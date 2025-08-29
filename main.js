@@ -266,15 +266,16 @@ function initWeights(){
     return
   }
 
-  initConvWeights(cW1)
-  initConvWeights(cW2)
-  initConvBias(cb1)
-  initConvBias(cb2)
-  initW(W1)
-  initW(b1)
+  //initConvWeights(cW1)
+  //initConvWeights(cW2)
+  //initConvBias(cb1)
+  //initConvBias(cb2)
+  //initW(W1)
+  //initW(b1)
   initW(W2)
   initBias(b2)
 }
 
 function log(n){ console.log(n) }
+
 
