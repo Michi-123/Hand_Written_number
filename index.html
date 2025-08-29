@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>Handwritten Recognition — V1</title>
+  <title>Handwritten Recognition — V2</title>
   <style>
     :root{
       --bg:#0b0b0c;
@@ -137,6 +137,17 @@
 
     /* Footer outputs */
     .outputs{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  
+    /* Character picker */
+    .char-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+    .char-btn{
+      display:flex;align-items:center;justify-content:center;
+      border:1px solid var(--border); background:#1b1d23; color:var(--text);
+      border-radius:12px; padding:10px; font-weight:800; font-size:18px; cursor:pointer;
+      user-select:none;
+    }
+    .char-btn[aria-pressed="true"]{outline:2px solid var(--acc)}
+    @media (max-width:640px){ .char-grid{grid-template-columns:repeat(5,minmax(0,1fr))} }
   </style>
 </head>
 <body>
@@ -157,7 +168,7 @@
       </div>
 
       <header>
-        <h1>手書き認識 — スマホ対応</h1>
+        <h1>手書き認識 — スマホ対応v2</h1>
       </header>
 
       <!-- Drawing area (shared across tabs) -->
@@ -199,7 +210,7 @@
       <div class="panels">
 
         <!-- データ作成 -->
-        <section id="panel_data" class="stack" style="margin-top:10px">
+        <section id="panel_data" class="stack" style="margin-top:10px">\n  <div class="card">\n    <div class="stack">\n      <label class="small">文字の選択</label>\n      <div id="char_buttons" class="char-grid"></div>\n      <div class="small">選択中: <span id="selected_char">-</span></div>\n    </div>\n  </div>
           <div class="card grid grid-2">
             <div class="stack">
               <label class="small" for="predict_type">種別</label>
@@ -333,6 +344,82 @@
         localStorage.setItem(key, r.id);
       }));
     })();
+  
+  <script>
+    (function(){
+      // Build character buttons based on global `target` array and sync to the hidden radio group (#radio)
+      function buildCharButtons(){
+        var host = document.getElementById('char_buttons');
+        var selView = document.getElementById('selected_char');
+        if(!host) return;
+        host.innerHTML = '';
+        if(typeof target === 'undefined' || !Array.isArray(target)){ return; }
+
+        // If #radio was re-created by createTable(), ensure there is a checked item; default to first.
+        var radios = document.querySelectorAll('#radio input[name="num"]');
+        if(radios.length){
+          var checked = Array.from(radios).find(r => r.checked) || radios[0];
+          if(checked) checked.checked = true;
+        }
+
+        // Find current selected index (from radio), else 0
+        function getSelectedIdx(){
+          var r = document.querySelector('#radio input[name="num"]:checked');
+          return r ? parseInt(r.value, 10) : 0;
+        }
+
+        function setSelectedIdx(idx){
+          var r = document.querySelector('#radio input[name="num"][value="'+idx+'"]');
+          if(r){ r.checked = true; }
+          updateButtons();
+        }
+
+        function updateButtons(){
+          var idx = getSelectedIdx();
+          // update aria-pressed & selected label
+          Array.from(host.children).forEach((btn, i) => {
+            btn.setAttribute('aria-pressed', String(i === idx));
+          });
+          if(selView){ selView.textContent = target[idx] ?? '-'; }
+        }
+
+        target.forEach((ch, i) => {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'char-btn';
+          b.textContent = ch;
+          b.setAttribute('data-idx', String(i));
+          b.setAttribute('aria-pressed', 'false');
+          b.addEventListener('click', function(){
+            var idx = parseInt(this.getAttribute('data-idx'), 10);
+            setSelectedIdx(idx);
+          });
+          host.appendChild(b);
+        });
+
+        updateButtons();
+      }
+
+      // Rebuild when labels change (predict_type change triggers main.js -> createTable())
+      document.addEventListener('DOMContentLoaded', function(){
+        // Initial build after main.js setup finishes
+        setTimeout(buildCharButtons, 0);
+      });
+
+      // Observe DOM changes on #radio to rebuild buttons (since createTable() recreates it)
+      var radioHost = document.getElementById('radio');
+      if (window.MutationObserver && radioHost){
+        var mo = new MutationObserver(function(){ buildCharButtons(); });
+        mo.observe(radioHost, {childList:true, subtree:true});
+      }
+
+      // Also hook predict_type changes just in case
+      var sel = document.getElementById('predict_type');
+      if(sel){
+        sel.addEventListener('change', function(){ setTimeout(buildCharButtons, 0); });
+      }
+    })();
   </script>
+</script>
 </body>
 </html>
