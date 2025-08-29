@@ -1,0 +1,317 @@
+<!doctype html>
+
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>スマホ対応キャンバスお絵描き</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151923cc;
+      --text: #e8e8ea;
+      --muted: #9aa0a6;
+      --accent: #6ae3ff;
+      --danger: #ff6a6a;
+      --radius: 16px;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }* { box-sizing: border-box; }
+html, body { height: 100%; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { display: flex; flex-direction: column; overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
+
+.toolbar {
+  position: sticky; top: 0; z-index: 10; width: 100%;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  padding: calc(env(safe-area-inset-top) + 8px) 12px 12px 12px;
+  background: var(--panel);
+  backdrop-filter: blur(8px) saturate(1.2);
+  box-shadow: var(--shadow);
+}
+.toolbar .spacer { flex: 1; }
+
+.btn { appearance: none; border: 0; padding: 10px 12px; border-radius: 12px; cursor: pointer; font-size: 14px; color: var(--text);
+  background: #222837; box-shadow: inset 0 0 0 1px #2c3448, 0 4px 14px rgba(0,0,0,.25);
+  transition: transform .06s ease, background .2s ease, box-shadow .2s ease;
+}
+.btn:active { transform: translateY(1px) scale(.98); }
+.btn[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent), 0 4px 14px rgba(0,0,0,.25); }
+.btn.danger { background: #3a1f22; box-shadow: inset 0 0 0 1px #4a262a; }
+
+.field { display: inline-flex; align-items: center; gap: .5rem; padding: 8px 10px; border-radius: 12px; background: #1a1f2c; box-shadow: inset 0 0 0 1px #2c3448; }
+.field label { font-size: 12px; color: var(--muted); }
+input[type="range"] { width: 140px; }
+input[type="color"] { width: 36px; height: 36px; padding: 0; border: none; background: none; border-radius: 8px; box-shadow: inset 0 0 0 1px #2c3448; }
+
+.wrap { position: relative; flex: 1; min-height: 0; }
+canvas { width: 100%; height: 100%; display: block; background: #ffffff; touch-action: none; -webkit-touch-callout: none; }
+
+.footer { padding: 8px 12px calc(env(safe-area-inset-bottom) + 10px); color: var(--muted); font-size: 12px; text-align: center; }
+.hint { color: var(--muted); font-size: 12px; }
+
+@media (max-width: 480px) {
+  .toolbar { gap: .4rem; }
+  .btn { padding: 9px 10px; font-size: 13px; }
+  input[type="range"] { width: 110px; }
+}
+
+  </style>
+</head>
+<body>
+  <div class="toolbar" id="toolbar">
+    <div class="field" title="色">
+      <label for="color">色</label>
+      <input id="color" type="color" value="#1f2937" />
+    </div>
+    <div class="field" title="太さ">
+      <label for="size">太さ</label>
+      <input id="size" type="range" min="1" max="60" step="1" value="8" />
+      <span id="sizeVal" class="hint">8px</span>
+    </div>
+    <button id="eraser" class="btn" aria-pressed="false" title="消しゴム (トグル)">消しゴム</button>
+    <button id="undo" class="btn" title="元に戻す">元に戻す</button>
+    <button id="redo" class="btn" title="やり直し">やり直し</button>
+    <button id="clear" class="btn danger" title="全消去">全消去</button>
+    <div class="spacer"></div>
+    <label class="field" title="筆圧対応 (対応機のみ)"><input id="pressure" type="checkbox" /> 筆圧</label>
+    <button id="save" class="btn" title="PNGとして保存">PNG保存</button>
+  </div>  <div class="wrap"><canvas id="canvas"></canvas></div>  <div class="footer">
+    ヒント: 指/ペンで描画。2本指のジェスチャは無効。画面の回転やウィンドウサイズ変更でも絵は維持されます。
+  </div>  <script>
+  (() => {
+    // ===== DOM refs =====
+    const canvas = document.getElementById('canvas');
+    const toolbar = document.getElementById('toolbar');
+    const ctx = canvas.getContext('2d');
+    const colorEl = document.getElementById('color');
+    const sizeEl = document.getElementById('size');
+    const sizeVal = document.getElementById('sizeVal');
+    const eraserEl = document.getElementById('eraser');
+    const undoEl = document.getElementById('undo');
+    const redoEl = document.getElementById('redo');
+    const clearEl = document.getElementById('clear');
+    const saveEl = document.getElementById('save');
+    const pressureEl = document.getElementById('pressure');
+
+    // ===== State =====
+    let drawing = false;
+    let erasing = false;
+    let lastPt = null;        // {x, y, w}
+    let lastMid = null;       // midpoint for quad smoothing
+    let activePointerId = null;
+
+    const history = { stack: [], redo: [], max: 30 };
+
+    function dpr() { return Math.max(1, Math.min(3, window.devicePixelRatio || 1)); }
+
+    function getCanvasCSSSize() {
+      // fill the remaining viewport below toolbar
+      const rect = canvas.getBoundingClientRect();
+      return { w: rect.width, h: rect.height };
+    }
+
+    function resizeCanvasPreserve() {
+      const prevUrl = canvas.toDataURL('image/png');
+      const ratio = dpr();
+      const { w, h } = getCanvasCSSSize();
+      const wpx = Math.max(1, Math.floor(w * ratio));
+      const hpx = Math.max(1, Math.floor(h * ratio));
+      if (canvas.width === wpx && canvas.height === hpx) return;
+      canvas.width = wpx; canvas.height = hpx;
+      // Reset transform then scale to DPR so drawing units are CSS pixels
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.scale(ratio, ratio);
+      // Repaint previous image scaled to new size
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width / ratio, canvas.height / ratio);
+      img.src = prevUrl;
+    }
+
+    function layout() {
+      // Ensure the canvas DOM element fills the remaining height
+      const vh = window.innerHeight;
+      const tb = toolbar.getBoundingClientRect().height;
+      canvas.style.height = Math.max(0, vh - tb) + 'px';
+      canvas.style.width = '100%';
+      resizeCanvasPreserve();
+    }
+
+    // Debounce helper
+    function debounce(fn, ms) {
+      let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(null, args), ms); };
+    }
+
+    // History helpers
+    function pushHistory(label = '') {
+      try {
+        const url = canvas.toDataURL('image/png');
+        if (history.stack.length >= history.max) history.stack.shift();
+        history.stack.push(url);
+        history.redo.length = 0;
+      } catch(e) { console.warn('History push failed', e); }
+    }
+
+    function restoreFrom(url) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0, canvas.width / dpr(), canvas.height / dpr()); resolve(); };
+        img.src = url;
+      });
+    }
+
+    function undo() {
+      if (history.stack.length <= 1) return; // keep at least initial state
+      const cur = history.stack.pop();
+      history.redo.push(cur);
+      restoreFrom(history.stack[history.stack.length - 1]);
+    }
+
+    function redo() {
+      if (!history.redo.length) return;
+      const url = history.redo.pop();
+      history.stack.push(url);
+      restoreFrom(url);
+    }
+
+    // Drawing helpers
+    function setStrokeStyle() {
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalCompositeOperation = erasing ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = erasing ? 'rgba(0,0,0,1)' : colorEl.value;
+    }
+
+    function widthFromPressure(base, p) {
+      if (!pressureEl.checked) return base;
+      // min 30% .. 130% based on pressure (0..1). Some devices report ~0.1 at rest.
+      const pr = Math.min(1, Math.max(0, p || 0));
+      return base * (0.3 + pr * 1.0);
+    }
+
+    function dist(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return Math.hypot(dx, dy); }
+    function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, w: (a.w + b.w) / 2 }; }
+
+    function drawSegment(a, b, c) {
+      // Quadratic curve from a->b using control point b, ending at c (midpoint)
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.quadraticCurveTo(b.x, b.y, c.x, c.y);
+      // Width modulation: approximate by using the end width
+      ctx.lineWidth = c.w;
+      ctx.stroke();
+    }
+
+    function pointerToPoint(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const base = parseFloat(sizeEl.value);
+      const w = widthFromPressure(base, e.pressure);
+      return { x, y, w };
+    }
+
+    function beginStroke(e) {
+      if (drawing) return; // ignore extra pointers
+      activePointerId = e.pointerId;
+      drawing = true;
+      lastPt = pointerToPoint(e);
+      lastMid = lastPt;
+      setStrokeStyle();
+      canvas.setPointerCapture(e.pointerId);
+    }
+
+    function moveStroke(e) {
+      if (!drawing || e.pointerId !== activePointerId) return;
+      const events = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : [e];
+      for (const ev of events) {
+        const pt = pointerToPoint(ev);
+        const m = mid(lastPt, pt);
+        drawSegment(lastMid, lastPt, m);
+        lastPt = pt;
+        lastMid = m;
+      }
+    }
+
+    function endStroke(e) {
+      if (!drawing || (activePointerId !== null && e.pointerId !== activePointerId)) return;
+      drawing = false;
+      activePointerId = null;
+      lastPt = null; lastMid = null;
+      pushHistory('stroke');
+    }
+
+    function cancelStroke() {
+      drawing = false; activePointerId = null; lastPt = null; lastMid = null;
+    }
+
+    // Save helper (fill white background for PNG)
+    function savePNG() {
+      try {
+        const ratio = dpr();
+        const w = Math.round(canvas.width / ratio);
+        const h = Math.round(canvas.height / ratio);
+        const off = document.createElement('canvas');
+        off.width = w * ratio; off.height = h * ratio;
+        const octx = off.getContext('2d');
+        // White background
+        octx.fillStyle = '#ffffff';
+        octx.fillRect(0, 0, off.width, off.height);
+        // Draw current canvas (already DPR-scaled)
+        octx.drawImage(canvas, 0, 0, off.width, off.height);
+        const url = off.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url; a.download = 'drawing.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        // iOS fallback
+        if (/iP(ad|hone|od)/.test(navigator.userAgent)) window.open(url, '_blank');
+      } catch (e) { console.error(e); alert('保存に失敗しました'); }
+    }
+
+    // Prevent scrolling with multi-touch on the canvas only
+    canvas.addEventListener('touchstart', (ev) => { if (ev.touches.length > 1) ev.preventDefault(); }, { passive: false });
+
+    // Pointer events
+    canvas.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; beginStroke(e); });
+    canvas.addEventListener('pointermove', moveStroke);
+    canvas.addEventListener('pointerup', endStroke);
+    canvas.addEventListener('pointercancel', cancelStroke);
+    canvas.addEventListener('pointerleave', cancelStroke);
+
+    // UI events
+    sizeEl.addEventListener('input', () => { sizeVal.textContent = sizeEl.value + 'px'; });
+    colorEl.addEventListener('input', () => { if (!erasing) ctx.strokeStyle = colorEl.value; });
+
+    eraserEl.addEventListener('click', () => {
+      erasing = !erasing;
+      eraserEl.setAttribute('aria-pressed', String(erasing));
+      setStrokeStyle();
+    });
+
+    undoEl.addEventListener('click', undo);
+    redoEl.addEventListener('click', redo);
+
+    clearEl.addEventListener('click', () => {
+      if (!confirm('全消去しますか？')) return;
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+      // 塗りつぶし背景を白に戻す
+      ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width / dpr(), canvas.height / dpr()); ctx.restore();
+      pushHistory('clear');
+    });
+
+    saveEl.addEventListener('click', savePNG);
+
+    // Initial layout & history seed
+    const onResize = debounce(() => { layout(); }, 120);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+
+    // First paint
+    requestAnimationFrame(() => {
+      layout();
+      // Seed white background and history
+      ctx.save(); ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width / dpr(), canvas.height / dpr()); ctx.restore();
+      pushHistory('init');
+    });
+  })();
+  </script></body>
+  </html>
