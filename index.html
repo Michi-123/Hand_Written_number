@@ -1,13 +1,13 @@
-
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-GPT1
-  <title>Hand written recognition (Mobile Tabs)</title>
-<style>
+<title>Hand written recognition (Mobile Tabs)</title>
+
+  GPT2
+  
+  <style>
   :root{
     --pad: 10px;
     --gap: 12px;
@@ -79,30 +79,30 @@ GPT1
     <section class="panel">
       <h3 style="margin-top:0">手書き入力</h3>
       <canvas id="canvas" width="280" height="280"></canvas>
-      <div class="row" style="margin-top:8px">
-        <label class="inline">線色</label>
-        <input type="color" id="pen_color" value="#ff7777"/>
-        <!-- 互換性維持のため hidden の#color を同期して残す -->
-        <input type="color" id="color" value="#ff7777" style="display:none"/>
-        <button class="btn clear_canvas">Clear</button>
-        <button class="btn" id="add_btn">Add</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <label class="inline">種別</label>
-        <select id="predict_type">
-          <option value="0">数字</option>
-          <option value="1">アルファベット</option>
-          <option value="2">かな</option>
-          <option value="3">記号</option>
-        </select>
-      </div>
+      
     </section>
 
     <!-- Right: Tabs content -->
     <section>
       <!-- データ作成 / 学習 / 推論 の各パネル -->
-      <div id="panel-data" class="panel" role="tabpanel" aria-labelledby="tab-data">
-        <h3 style="margin-top:0">データ作成</h3>
+      $1
+        <div class="row">
+          <label class="inline">線色</label>
+          <input type="color" id="pen_color" value="#ff7777"/>
+          <input type="color" id="color" value="#ff7777" style="display:none"/>
+          <button class="btn clear_canvas">Clear</button>
+          <button class="btn" id="add_btn">Add</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label class="inline">種別</label>
+          <select id="predict_type">
+            <option value="0">数字</option>
+            <option value="1">アルファベット</option>
+            <option value="2">かな</option>
+            <option value="3">記号</option>
+          </select>
+        </div>
+
         <div class="row">
           <button class="btn" id="clear_batch">Clr Bat</button>
         </div>
