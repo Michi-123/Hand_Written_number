@@ -1,476 +1,333 @@
 <!doctype html>
-
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
-  <title>Hand‑Written Number – Mobile Canvas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>手書き数字認識（スマホ対応デモ）</title>
   <style>
     :root {
-      --toolbar-h: 88px;
-      --radius: 14px;
-      --shadow: 0 6px 16px rgba(0,0,0,.08);
-      --border: 1px solid #d7dbe7;
+      --bg: #0b0b0e;
+      --fg: #e7e7ea;
+      --muted: #a3a3ad;
+      --card: #15161a;
+      --border: #272833;
+      --accent: #6ea8fe;
+      --danger: #ff6b6b;
+      --ok: #7bd88f;
     }
-    html, body { height: 100%; margin: 0; background: #f6f7fb; color: #111; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans JP"; -webkit-tap-highlight-color: transparent; }
-    .wrap { position: fixed; inset: 0; display: grid; grid-template-rows: var(--toolbar-h) 1fr; }
-    header { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top) + 8px) 10px 10px; background: #fff; box-shadow: var(--shadow); z-index: 2; }
-    header .title { font-weight: 700; margin-right: 8px; white-space: nowrap; }
-    header .spacer { flex: 1; }
-    .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    button, select, input[type="range"], input[type="color"], label.opt { height: 44px; border-radius: 12px; border: var(--border); background: #fff; padding: 0 12px; font-size: 15px; }
-    button { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
-    button.primary { background: #111; color: #fff; border-color: #111; }
-    button.ghost { background: #fff; }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f7f7fb; --fg: #101014; --muted: #474753; --card: #ffffff; --border: #e6e6ef; --accent: #2458e6; --danger: #d34040; --ok: #0a8f4d;
+      }
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, "ヒラギノ角ゴ ProN", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    .wrap {
+      min-height: 100%;
+      padding: 16px env(safe-area-inset-right) calc(16px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+      display: grid;
+      place-items: start center;
+    }
+    .container {
+      width: min(900px, 100%);
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 820px) {
+      .container { grid-template-columns: 1.1fr 0.9fr; align-items: start; }
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.2);
+      overflow: clip;
+    }
+    .card h2 { margin: 0; font-size: 18px; }
+    .card .hd { display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 12px 14px; border-bottom:1px solid var(--border); }
+    .card .bd { padding: 14px; }
+
+    /* 描画エリア */
+    .canvas-wrap { width: 100%; }
+    canvas { width: 100%; height: auto; display: block; touch-action: none; background: #111; border-radius: 12px; border: 1px dashed var(--border); }
+    .tools { display:flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+    .tools .row { display:flex; gap:10px; align-items:center; }
+    button, .btn {
+      appearance: none; border: 1px solid var(--border); background: transparent; color: var(--fg);
+      padding: 10px 14px; border-radius: 999px; font-weight: 600; cursor: pointer;
+    }
     button:active { transform: translateY(1px); }
-    label.opt { display: inline-flex; align-items: center; gap: 8px; padding: 0 8px; }
-    #board { position: relative; background: #fff; margin: 10px; margin-bottom: calc(10px + env(safe-area-inset-bottom)); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-    canvas { width: 100%; height: 100%; display: block; /* touch-action is controlled dynamically in JS */ }
-    .hint { position: absolute; left: 12px; bottom: 12px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; padding: 6px 10px; border-radius: 999px; pointer-events: none; }
+    .btn-primary { background: var(--accent); color: white; border-color: transparent; }
+    .btn-danger { background: var(--danger); color: white; border-color: transparent; }
+    .btn-ok { background: var(--ok); color: #021; border-color: transparent; }
+    label { color: var(--muted); font-size: 14px; }
+    input[type="range"] { width: 160px; }
+
+    .hint { color: var(--muted); font-size: 14px; }
+
+    .preview-area { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+    .preview {
+      display:grid; gap:8px; align-content:start;
+    }
+    .preview canvas { background: #fff; border-radius: 8px; border:1px solid var(--border); }
+    .meta { font-size: 13px; color: var(--muted); }
+
+    .footer { text-align:center; color: var(--muted); font-size: 12px; padding: 8px; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; padding:2px 6px; border:1px solid var(--border); border-radius:6px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <div class="title">📱 手書きキャンバス（スマホ最適化）</div>
-      <div class="toolbar">
-        <button id="penBtn" class="primary" title="ペン">ペン</button>
-        <button id="eraserBtn" class="ghost" title="消しゴム">消しゴム</button>
-        <label class="opt" title="色"><span>色</span><input id="color" type="color" value="#111111" /></label>
-        <label class="opt" title="太さ"><span>太さ</span><input id="size" type="range" min="2" max="48" step="1" value="14" /></label>
-        <label class="opt" title="筆圧対応"><input id="pressure" type="checkbox" checked />筆圧</label>
-        <button id="undoBtn" class="ghost" title="一つ戻す">↶ 戻す</button>
-        <button id="redoBtn" class="ghost" title="やり直し">↷ 進む</button>
-        <button id="clearBtn" class="ghost" title="全消去">🗑 全消去</button>
-        <button id="saveBtn" class="ghost" title="PNG保存">💾 PNG</button>
-      </div>
-      <div class="spacer"></div>
-    </header>
-    <div id="board">
-      <canvas id="canvas"></canvas>
-      <div class="hint">1本指で描画 / 指を離すとスクロール可能</div>
+    <div class="container">
+      <section class="card">
+        <div class="hd">
+          <h2>① キャンバスに数字を描く</h2>
+          <div class="hint">指・ペン・マウス対応 / ピンチ操作不要</div>
+        </div>
+        <div class="bd">
+          <div class="canvas-wrap">
+            <canvas id="draw" aria-label="手書き入力キャンバス" role="img"></canvas>
+          </div>
+          <div class="tools">
+            <div class="row">
+              <button id="undoBtn" class="btn">元に戻す</button>
+              <button id="clearBtn" class="btn btn-danger">全消去</button>
+              <button id="invertBtn" class="btn">白黒反転</button>
+            </div>
+            <div class="row">
+              <label for="thick">線の太さ</label>
+              <input id="thick" type="range" min="4" max="36" value="16" />
+              <span id="thickVal" class="meta">16px</span>
+            </div>
+            <div class="row">
+              <button id="saveBtn" class="btn">PNG保存</button>
+              <button id="predictBtn" class="btn btn-primary">推論（ダミー）</button>
+            </div>
+          </div>
+          <p class="hint" style="margin-top:10px">
+            スクロール誤動作を防ぐためキャンバス上のジェスチャーは無効化しています。ページ移動はキャンバス外をスワイプしてください。
+          </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="hd">
+          <h2>② 前処理 & プレビュー</h2>
+          <div class="hint">28×28 グレースケールに縮小／モデル入力を確認</div>
+        </div>
+        <div class="bd">
+          <div class="preview-area">
+            <div class="preview">
+              <strong>28×28（x8表示）</strong>
+              <canvas id="mini" width="224" height="224"></canvas>
+              <div class="meta" id="stats">ピクセル統計: -</div>
+            </div>
+            <div class="preview">
+              <strong>入力ベクトル</strong>
+              <div id="vector" class="meta" style="max-height:220px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px; background: rgba(0,0,0,0.1)"></div>
+              <div class="hint">※ 値は0〜1に正規化（白=0, 黒=1）。必要に応じて反転可。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer">© 2025 Handwritten Demo — スマホ最適化: メタビューポート / DPIスケーリング / Pointer Events / 安全域（ノッチ）対応</div>
     </div>
-  </div>  <script>
-  (() => {
-    const canvas = document.getElementById('canvas');
-    const board = document.getElementById('board');
-    const ctx = canvas.getContext('2d', { alpha: true });
+  </div>
 
-    const penBtn = document.getElementById('penBtn');
-    const eraserBtn = document.getElementById('eraserBtn');
-    const colorEl = document.getElementById('color');
-    const sizeEl = document.getElementById('size');
-    const pressureEl = document.getElementById('pressure');
-    const undoBtn = document.getElementById('undoBtn');
-    const redoBtn = document.getElementById('redoBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const saveBtn = document.getElementById('saveBtn');
+<script>
+(() => {
+  const canvas = document.getElementById('draw');
+  const ctx = canvas.getContext('2d');
+  const mini = document.getElementById('mini');
+  const miniCtx = mini.getContext('2d');
 
-    // ====== スマホ最適化のポイント ======
-    // ・DPRに合わせた高精細スケーリング
-    // ・描画中のみ touch-action: none（それ以外は pan-y pinch-zoom を許可）
-    // ・シングルタッチのみ描画（他の指は無視）
+  const thick = document.getElementById('thick');
+  const thickVal = document.getElementById('thickVal');
+  const undoBtn = document.getElementById('undoBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const invertBtn = document.getElementById('invertBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const predictBtn = document.getElementById('predictBtn');
+  const vectorEl = document.getElementById('vector');
+  const statsEl = document.getElementById('stats');
 
-    let tool = 'pen'; // 'pen' | 'eraser'
-    let dpr = Math.max(1, window.devicePixelRatio || 1);
-    const defaultTouchAction = 'pan-y pinch-zoom';
-    canvas.style.touchAction = defaultTouchAction;
+  let drawing = false;
+  let last = null;
+  let penColor = '#fff'; // 白地に黒 or 黒地に白を切替可（反転時に入替）
+  let bgColor = '#000';
+  let strokes = []; // ベクターベースで保持（再描画/リサイズ可）
+  let activeStroke = null;
 
-    const state = {
-      strokes: [], // { tool, color, size, points:[{x,y,p,t}] }
-      redo: [],
-      drawing: false,
-      activeStroke: null,
-      activePointerId: null,
-    };
+  function setSize() {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = canvas.getBoundingClientRect();
+    // 正方形に保つ（横幅に合わせる）
+    const cssSize = Math.round(rect.width);
+    canvas.style.height = cssSize + 'px';
+    canvas.width  = Math.round(cssSize * dpr);
+    canvas.height = Math.round(cssSize * dpr);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    redraw();
+    updateMiniAndVector();
+  }
 
-    function cssSize() {
-      const style = getComputedStyle(board);
-      const w = board.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-      // 画面高−ヘッダ−マージンでキャンバス高さを算出
-      const headerH = document.querySelector('header').getBoundingClientRect().height;
-      const h = Math.max(240, window.innerHeight - headerH - 20 - (parseFloat(getComputedStyle(board).marginBottom) || 0));
-      return { w: Math.max(240, w), h };
-    }
+  function redraw() {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.width; // 正方形
+    // 背景塗り
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, w, h);
 
-    function resizeCanvas(preserve = true) {
-      const { w, h } = cssSize();
-      let snapshot = null;
-      if (preserve && canvas.width > 0 && canvas.height > 0) {
-        try { snapshot = canvas.toDataURL('image/png'); } catch {}
-      }
-      canvas.style.width = w + 'px';
-      canvas.style.height = h + 'px';
-      dpr = Math.max(1, window.devicePixelRatio || 1);
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.lineCap = 'round';
+    // 既存ストローク描画（正規化座標→実座標）
+    for (const s of strokes) {
       ctx.lineJoin = 'round';
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      if (snapshot) {
-        const img = new Image();
-        img.onload = () => { ctx.drawImage(img, 0, 0, w, h); };
-        img.src = snapshot;
-      } else {
-        redraw();
-      }
-    }
-
-    function setTool(next) {
-      tool = next;
-      penBtn.classList.toggle('primary', tool === 'pen');
-      eraserBtn.classList.toggle('primary', tool === 'eraser');
-      penBtn.classList.toggle('ghost', tool !== 'pen');
-      eraserBtn.classList.toggle('ghost', tool !== 'eraser');
-    }
-
-    function pressureWidth(p) {
-      if (!pressureEl.checked) return parseInt(sizeEl.value, 10);
-      const base = parseInt(sizeEl.value, 10);
-      const q = (p > 0 ? p : 0.5); // 0..1（非対応端末は0.5相当）
-      return Math.max(1, Math.round(base * (0.5 + 0.7 * q)));
-    }
-
-    function ptFromEvent(e) {
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left),
-        y: (e.clientY - rect.top),
-        p: e.pressure ?? 0,
-        t: performance.now()
-      };
-    }
-
-    function startStroke(e) {
-      // 既に別の指で描画中なら無視
-      if (state.activePointerId !== null && e.pointerId !== state.activePointerId) return;
-      state.activePointerId = e.pointerId;
-      state.drawing = true;
-      state.redo.length = 0;
-      const stroke = { tool, color: colorEl.value, size: parseInt(sizeEl.value, 10), points: [] };
-      state.activeStroke = stroke;
-      state.strokes.push(stroke);
-      canvas.style.touchAction = 'none'; // 描画中はスクロール無効
-      try { canvas.setPointerCapture(e.pointerId); } catch {}
-      addPoint(e);
-    }
-
-    function addPoint(e) {
-      if (!state.drawing || !state.activeStroke) return;
-      if (e.pointerId !== state.activePointerId) return;
-      const pt = ptFromEvent(e);
-      state.activeStroke.points.push(pt);
-      drawLastSegment(state.activeStroke);
-    }
-
-    function endStroke(e) {
-      if (e && e.pointerId !== state.activePointerId) return;
-      state.drawing = false;
-      state.activeStroke = null;
-      try { canvas.releasePointerCapture(state.activePointerId); } catch {}
-      state.activePointerId = null;
-      canvas.style.touchAction = defaultTouchAction; // スクロール再有効化
-    }
-
-    function drawLastSegment(stroke) {
-      const pts = stroke.points;
-      if (pts.length < 2) return;
-      const n = pts.length;
-      const p0 = pts[n - 2];
-      const p1 = pts[n - 1];
-      const midX = (p0.x + p1.x) / 2;
-      const midY = (p0.y + p1.y) / 2;
-      ctx.save();
-      if (stroke.tool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.strokeStyle = 'rgba(0,0,0,1)';
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = stroke.color;
-      }
-      ctx.lineWidth = pressureWidth(p1.p);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = s.thickness * (w); // thicknessはキャンバス幅に対する比率
       ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y);
-      ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
+      for (let i = 0; i < s.points.length; i++) {
+        const p = s.points[i];
+        const x = p.x * w, y = p.y * h;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
       ctx.stroke();
-      ctx.restore();
     }
+  }
 
-    function redraw() {
-      const w = canvas.clientWidth, h = canvas.clientHeight;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, w, h);
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      for (const stroke of state.strokes) {
-        const pts = stroke.points;
-        if (pts.length === 0) continue;
-        ctx.save();
-        if (stroke.tool === 'eraser') {
-          ctx.globalCompositeOperation = 'destination-out';
-          ctx.strokeStyle = 'rgba(0,0,0,1)';
-        } else {
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.strokeStyle = stroke.color;
-        }
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) {
-          const p0 = pts[i - 1];
-          const p1 = pts[i];
-          const midX = (p0.x + p1.x) / 2;
-          const midY = (p0.y + p1.y) / 2;
-          ctx.lineWidth = pressureWidth(p1.p);
-          ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
-        }
-        ctx.stroke();
-        ctx.restore();
-      }
-      ctx.restore();
+  function startStroke(x, y) {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.width;
+    const t = (parseInt(thick.value, 10) / 100); // 100に対する比率
+    activeStroke = { color: penColor, thickness: t, points: [] };
+    activeStroke.points.push({ x: x / w, y: y / h });
+    strokes.push(activeStroke);
+    last = { x, y };
+  }
+
+  function extendStroke(x, y) {
+    if (!activeStroke) return;
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.width;
+    activeStroke.points.push({ x: x / w, y: y / h });
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = activeStroke.color;
+    ctx.lineWidth = activeStroke.thickness * (w);
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    last = { x, y };
+  }
+
+  function endStroke() {
+    activeStroke = null; last = null; updateMiniAndVector();
+  }
+
+  function pointerPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  // Pointer Events
+  canvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); canvas.setPointerCapture(e.pointerId);
+    drawing = true; const p = pointerPos(e); startStroke(p.x, p.y);
+  }, { passive: false });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drawing) return; e.preventDefault(); const p = pointerPos(e); extendStroke(p.x, p.y);
+  }, { passive: false });
+  const endAny = (e) => { if (!drawing) return; drawing = false; canvas.releasePointerCapture?.(e.pointerId); endStroke(); };
+  canvas.addEventListener('pointerup', endAny, { passive: false });
+  canvas.addEventListener('pointercancel', endAny, { passive: false });
+  canvas.addEventListener('pointerleave', endAny, { passive: false });
+
+  // UI: 太さ
+  const updateThickLabel = () => { thickVal.textContent = parseInt(thick.value, 10) + 'px'; };
+  thick.addEventListener('input', updateThickLabel);
+  updateThickLabel();
+
+  // 操作ボタン
+  undoBtn.addEventListener('click', () => { strokes.pop(); redraw(); updateMiniAndVector(); });
+  clearBtn.addEventListener('click', () => { strokes = []; redraw(); updateMiniAndVector(); });
+  invertBtn.addEventListener('click', () => {
+    // 背景とペン色を入替（白地/黒字 <-> 黒地/白字）
+    const prevBg = bgColor; bgColor = penColor === '#fff' ? '#000' : '#fff';
+    penColor = prevBg;
+    redraw(); updateMiniAndVector();
+  });
+
+  saveBtn.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.download = 'handwritten.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  });
+
+  predictBtn.addEventListener('click', () => {
+    // 実運用ではここでモデル推論（tfjs/onnxruntime-webなど）を呼び出す
+    const arr = to28x28Vector();
+    alert('ダミー推論: ベクトル長 ' + arr.length + '（実装を差し替えてください）');
+  });
+
+  // 28x28への変換 & プレビュー
+  function to28x28Vector() {
+    // キャンバス内容を28x28に縮小して0〜1に正規化
+    const tmp = document.createElement('canvas');
+    tmp.width = 28; tmp.height = 28;
+    const tctx = tmp.getContext('2d');
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
+    // 現キャンバスを描画（CSSピクセル基準でOK）
+    const rect = canvas.getBoundingClientRect();
+    const snapshot = document.createElement('canvas');
+    snapshot.width = rect.width; snapshot.height = rect.width;
+    const sctx = snapshot.getContext('2d');
+    sctx.drawImage(canvas, 0, 0, rect.width, rect.width);
+    tctx.drawImage(snapshot, 0, 0, 28, 28);
+
+    const { data } = tctx.getImageData(0, 0, 28, 28);
+    const v = new Float32Array(28 * 28);
+    let sum = 0, min = 1, max = 0;
+    const bgWhite = (bgColor === '#fff');
+    for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+      // 単純な輝度 Y = 0.299R + 0.587G + 0.114B（0〜255）
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const y = 0.299 * r + 0.587 * g + 0.114 * b; // 0..255
+      let val = bgWhite ? (1 - y / 255) : (y / 255); // 白地→黒=1, 黒地→白=1
+      v[j] = val;
+      sum += val; if (val < min) min = val; if (val > max) max = val;
     }
+    // プレビューへ反映
+    miniCtx.imageSmoothingEnabled = false;
+    // 拡大表示用に一旦28×28へ塗ってから224×224へ描画
+    const imgData = tctx.getImageData(0,0,28,28);
+    const scale = 8;
+    const up = document.createElement('canvas'); up.width = 28; up.height = 28;
+    up.getContext('2d').putImageData(imgData, 0, 0);
+    miniCtx.clearRect(0,0,mini.width, mini.height);
+    miniCtx.drawImage(up, 0,0, 28,28, 0,0, 28*scale, 28*scale);
 
-    function undo() {
-      if (state.strokes.length) { state.redo.push(state.strokes.pop()); redraw(); }
-    }
-    function redo() {
-      if (state.redo.length) { state.strokes.push(state.redo.pop()); redraw(); }
-    }
+    statsEl.textContent = `ピクセル統計: min=${min.toFixed(3)}  max=${max.toFixed(3)}  mean=${(sum/784).toFixed(3)}`;
+    vectorEl.textContent = Array.from(v).map(x => x.toFixed(2)).join(', ');
+    return v;
+  }
 
-    function clearAll() { state.strokes.length = 0; state.redo.length = 0; redraw(); }
+  function updateMiniAndVector(){ to28x28Vector(); }
 
-    function savePNG() {
-      const w = canvas.clientWidth; const h = canvas.clientHeight;
-      const out = document.createElement('canvas');
-      out.width = Math.floor(w * dpr); out.height = Math.floor(h * dpr);
-      const octx = out.getContext('2d');
-      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      octx.fillStyle = '#ffffff'; octx.fillRect(0, 0, w, h);
-      const dataURL = canvas.toDataURL('image/png');
-      const img = new Image();
-      img.onload = () => {
-        octx.drawImage(img, 0, 0, w, h);
-        const url = out.toDataURL('image/png');
-        const a = document.createElement('a');
-        a.href = url; a.download = `handwriting_${Date.now()}.png`;
-        document.body.appendChild(a); a.click(); a.remove();
-      };
-      img.src = dataURL;
-    }
-
-    // ====== Pointer / Touch Events ======
-    canvas.addEventListener('pointerdown', (e) => { if (e.isPrimary || e.pointerType !== 'touch') startStroke(e); });
-    canvas.addEventListener('pointermove', (e) => addPoint(e));
-    canvas.addEventListener('pointerup', (e) => endStroke(e));
-    canvas.addEventListener('pointercancel', (e) => endStroke(e));
-    canvas.addEventListener('pointerleave', (e) => endStroke(e));
-
-    // iOS Safari での2本指操作を妨げない（描画中以外）
-    document.addEventListener('touchstart', (e) => { /* passive でスクロール許可 */ }, { passive: true });
-
-    // ====== Controls ======
-    penBtn.addEventListener('click', () => setTool('pen'));
-    eraserBtn.addEventListener('click', () => setTool('eraser'));
-    undoBtn.addEventListener('click', undo);
-    redoBtn.addEventListener('click', redo);
-    clearBtn.addEventListener('click', clearAll);
-    saveBtn.addEventListener('click', savePNG);
-
-    // ====== Resize ======
-    const ro = new ResizeObserver(() => resizeCanvas(true));
-    ro.observe(board);
-    window.addEventListener('orientationchange', () => setTimeout(() => resizeCanvas(true), 200));
-    window.addEventListener('resize', () => resizeCanvas(true));
-
-    // Init
-    setTool('pen');
-    resizeCanvas(false);
-  })();
-  </script></body>
+  // 初期セットアップ
+  const ro = new ResizeObserver(() => setSize());
+  ro.observe(canvas);
+  window.addEventListener('orientationchange', setSize);
+  setTimeout(setSize, 0);
+})();
+</script>
+</body>
 </html>
-<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
-  <title>Hand‑Written Number – Mobile Canvas</title>
-  <style>
-    :root {
-      --toolbar-h: 88px;
-      --radius: 14px;
-      --shadow: 0 6px 16px rgba(0,0,0,.08);
-      --border: 1px solid #d7dbe7;
-    }
-    html, body { height: 100%; margin: 0; background: #f6f7fb; color: #111; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans JP"; -webkit-tap-highlight-color: transparent; }
-    .wrap { position: fixed; inset: 0; display: grid; grid-template-rows: var(--toolbar-h) 1fr; }
-    header { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top) + 8px) 10px 10px; background: #fff; box-shadow: var(--shadow); z-index: 2; }
-    header .title { font-weight: 700; margin-right: 8px; white-space: nowrap; }
-    header .spacer { flex: 1; }
-    .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    button, select, input[type="range"], input[type="color"], label.opt { height: 44px; border-radius: 12px; border: var(--border); background: #fff; padding: 0 12px; font-size: 15px; }
-    button { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
-    button.primary { background: #111; color: #fff; border-color: #111; }
-    button.ghost { background: #fff; }
-    button:active { transform: translateY(1px); }
-    label.opt { display: inline-flex; align-items: center; gap: 8px; padding: 0 8px; }
-    #board { position: relative; background: #fff; margin: 10px; margin-bottom: calc(10px + env(safe-area-inset-bottom)); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-    canvas { width: 100%; height: 100%; display: block; /* touch-action is controlled dynamically in JS */ }
-    .hint { position: absolute; left: 12px; bottom: 12px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; padding: 6px 10px; border-radius: 999px; pointer-events: none; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <header>
-      <div class="title">📱 手書きキャンバス（スマホ最適化）</div>
-      <div class="toolbar">
-        <button id="penBtn" class="primary" title="ペン">ペン</button>
-        <button id="eraserBtn" class="ghost" title="消しゴム">消しゴム</button>
-        <label class="opt" title="色"><span>色</span><input id="color" type="color" value="#111111" /></label>
-        <label class="opt" title="太さ"><span>太さ</span><input id="size" type="range" min="2" max="48" step="1" value="14" /></label>
-        <label class="opt" title="筆圧対応"><input id="pressure" type="checkbox" checked />筆圧</label>
-        <button id="undoBtn" class="ghost" title="一つ戻す">↶ 戻す</button>
-        <button id="redoBtn" class="ghost" title="やり直し">↷ 進む</button>
-        <button id="clearBtn" class="ghost" title="全消去">🗑 全消去</button>
-        <button id="saveBtn" class="ghost" title="PNG保存">💾 PNG</button>
-      </div>
-      <div class="spacer"></div>
-    </header>
-    <div id="board">
-      <canvas id="canvas"></canvas>
-      <div class="hint">1本指で描画 / 指を離すとスクロール可能</div>
-    </div>
-  </div>  <script>
-  (() => {
-    const canvas = document.getElementById('canvas');
-    const board = document.getElementById('board');
-    const ctx = canvas.getContext('2d', { alpha: true });
-
-    const penBtn = document.getElementById('penBtn');
-    const eraserBtn = document.getElementById('eraserBtn');
-    const colorEl = document.getElementById('color');
-    const sizeEl = document.getElementById('size');
-    const pressureEl = document.getElementById('pressure');
-    const undoBtn = document.getElementById('undoBtn');
-    const redoBtn = document.getElementById('redoBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const saveBtn = document.getElementById('saveBtn');
-
-    // ====== スマホ最適化のポイント ======
-    // ・DPRに合わせた高精細スケーリング
-    // ・描画中のみ touch-action: none（それ以外は pan-y pinch-zoom を許可）
-    // ・シングルタッチのみ描画（他の指は無視）
-
-    let tool = 'pen'; // 'pen' | 'eraser'
-    let dpr = Math.max(1, window.devicePixelRatio || 1);
-    const defaultTouchAction = 'pan-y pinch-zoom';
-    canvas.style.touchAction = defaultTouchAction;
-
-    const state = {
-      strokes: [], // { tool, color, size, points:[{x,y,p,t}] }
-      redo: [],
-      drawing: false,
-      activeStroke: null,
-      activePointerId: null,
-    };
-
-    function cssSize() {
-      const style = getComputedStyle(board);
-      const w = board.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-      // 画面高−ヘッダ−マージンでキャンバス高さを算出
-      const headerH = document.querySelector('header').getBoundingClientRect().height;
-      const h = Math.max(240, window.innerHeight - headerH - 20 - (parseFloat(getComputedStyle(board).marginBottom) || 0));
-      return { w: Math.max(240, w), h };
-    }
-
-    function resizeCanvas(preserve = true) {
-      const { w, h } = cssSize();
-      let snapshot = null;
-      if (preserve && canvas.width > 0 && canvas.height > 0) {
-        try { snapshot = canvas.toDataURL('image/png'); } catch {}
-      }
-      canvas.style.width = w + 'px';
-      canvas.style.height = h + 'px';
-      dpr = Math.max(1, window.devicePixelRatio || 1);
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      if (snapshot) {
-        const img = new Image();
-        img.onload = () => { ctx.drawImage(img, 0, 0, w, h); };
-        img.src = snapshot;
-      } else {
-        redraw();
-      }
-    }
-
-    function setTool(next) {
-      tool = next;
-      penBtn.classList.toggle('primary', tool === 'pen');
-      eraserBtn.classList.toggle('primary', tool === 'eraser');
-      penBtn.classList.toggle('ghost', tool !== 'pen');
-      eraserBtn.classList.toggle('ghost', tool !== 'eraser');
-    }
-
-    function pressureWidth(p) {
-      if (!pressureEl.checked) return parseInt(sizeEl.value, 10);
-      const base = parseInt(sizeEl.value, 10);
-      const q = (p > 0 ? p : 0.5); // 0..1（非対応端末は0.5相当）
-      return Math.max(1, Math.round(base * (0.5 + 0.7 * q)));
-    }
-
-    function ptFromEvent(e) {
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left),
-        y: (e.clientY - rect.top),
-        p: e.pressure ?? 0,
-        t: performance.now()
-      };
-    }
-
-    function startStroke(e) {
-      // 既に別の指で描画中なら無視
-      if (state.activePointerId !== null && e.pointerId !== state.activePointerId) return;
-      state.activePointerId = e.pointerId;
-      state.drawing = true;
-      state.redo.length = 0;
-      const stroke = { tool, color: colorEl.value, size: parseInt(sizeEl.value, 10), points: [] };
-      state.activeStroke = stroke;
-      state.strokes.push(stroke);
-      canvas.style.touchAction = 'none'; // 描画中はスクロール無効
-      try { canvas.setPointerCapture(e.pointerId); } catch {}
-      addPoint(e);
-    }
-
-    function addPoint(e) {
-      if (!state.drawing || !state.activeStroke) return;
-      if (e.pointerId !== state.activePointerId) return;
-      const pt = ptFromEvent(e);
-      state.activeStroke.points.push(pt);
-      drawLastSegment(state.activeStroke);
-    }
-
-    function endStroke(e) {
-      if (e && e.pointerId !== state.activePointerId) return;
-      state.drawing = false;
-      state.activeStroke = null;
-      try { canvas.releasePointerCapture(state.activePointerId); } catch {}
-      state.activePointerId = null;
-      canvas.style.touchAction = defaultTouchAction; // スクロール再有効化
-    }
-
-    function drawLastSegment(stroke) {
-      const pts = stroke.points;
-      if (pts.length < 2) return;
-      const n = pts.length;
-      const p0 = pts[n - 2];
-      const p1 = pts[n - 1];
-      const midX = (p0.x + p1.x) / 2;
- 
