@@ -9,19 +9,24 @@
     --pad: 10px;
     --gap: 12px;
     --radius: 10px;
-    --bg: #0b0b0c;
-    --panel:#1a1b1e;
-    --line:#2a2b30;
-    --text:#eaeef3;
-    --muted:#a7b0bd;
-    --accent:#5bbcff;
-    --ok:#00cc00;
+    /* Light theme */
+    --bg:    #f7f8fb;
+    --panel: #ffffff;
+    --line:  #d9dce5;
+    --text:  #1e2430;
+    --muted: #6b7280;
+    --accent:#2f7bff;
+    --ok:    #16a34a;
   }
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;}
   *{box-sizing:border-box}
 
   /* ===== Top Tabs ===== */
-  .tabs{position:sticky;top:0;z-index:5;background:linear-gradient(180deg, rgba(0,0,0,.65), rgba(0,0,0,0));padding:var(--pad) var(--pad) 0}
+  .tabs{
+    position:sticky;top:0;z-index:5;
+    background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0));
+    padding:var(--pad) var(--pad) 0;
+  }
   .tabbar{display:flex;gap:8px;}
   .tabbar button{flex:1;appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:10px 12px;border-radius:999px;font-weight:600}
   .tabbar button[aria-selected="true"]{outline:2px solid var(--accent);}
@@ -37,10 +42,17 @@
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:var(--pad)}
   .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   label.inline{font-size:14px;color:var(--muted)}
-  input[type="number"], input[type="text"], input[type="range"], select{background:#0e0f12;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+  input[type="number"], input[type="text"], input[type="range"], select{
+    background:#fff; color:var(--text);
+    border:1px solid var(--line); border-radius:8px; padding:6px 8px;
+  }
   input[type="range"]{width:180px}
-  .btn{appearance:none;border:1px solid var(--line);background:#141519;color:var(--text);padding:8px 12px;border-radius:10px;font-weight:600}
-  .btn.ok{border-color:#0d3;}
+  .btn{
+    appearance:none; border:1px solid var(--line);
+    background:#fff; color:var(--text);
+    padding:8px 12px; border-radius:10px; font-weight:600;
+  }
+  .btn.ok{ border-color:#22c55e; }
 
   /* Canvas */
   #canvas{background:#fff;border:1px solid #aaa;border-radius:8px;touch-action:none;display:block;width:min(92vw, 360px);height:min(92vw, 360px)}
@@ -49,7 +61,7 @@
   .classes-wrap{overflow:auto}
   table#classes_data, table#classes_pred{width:100%;border-collapse:collapse}
   table#classes_data td, table#classes_pred td, table#classes_data th, table#classes_pred th{border-bottom:1px solid var(--line);padding:8px}
-  table#classes_data tr:hover, table#classes_pred tr:hover{background:#13161c}
+  table#classes_data tr:hover, table#classes_pred tr:hover{background:#f3f6fb}
   td.cell{width:42px;text-align:center;font-weight:700}
   td.graph{min-width:160px}
   .bar{height:12px;background:var(--ok);border-radius:6px}
@@ -62,11 +74,12 @@
 </head>
 <body>
 
+<!-- タブ見出し（順番と既定選択を変更） -->
 <div class="tabs" role="tablist" aria-label="handwrite tabs">
   <div class="tabbar">
-    <button id="tab-data" role="tab" aria-controls="panel-data" aria-selected="true">データ作成</button>
+    <button id="tab-infer" role="tab" aria-controls="panel-infer" aria-selected="true">推論</button>
+    <button id="tab-data"  role="tab" aria-controls="panel-data"  aria-selected="false">データ作成</button>
     <button id="tab-train" role="tab" aria-controls="panel-train" aria-selected="false">学習</button>
-    <button id="tab-infer" role="tab" aria-controls="panel-infer" aria-selected="false">推論</button>
   </div>
 </div>
 
@@ -82,7 +95,7 @@
     <!-- Right: Tabs content -->
     <section>
       <!-- データ作成 / 学習 / 推論 の各パネル -->
-      <div id="panel-data" class="panel" role="tabpanel" aria-labelledby="tab-data">
+      <div id="panel-data" class="panel" role="tabpanel" hidden aria-labelledby="tab-data">
         <div class="row">
           <label class="inline">種別</label>
           <select id="predict_type">
@@ -117,7 +130,8 @@
         </div>
       </div>
 
-      <div id="panel-infer" class="panel" role="tabpanel" hidden aria-labelledby="tab-infer">
+      <!-- タブパネル（推論を表示、他は非表示に） -->
+      <div id="panel-infer" class="panel" role="tabpanel" aria-labelledby="tab-infer">
         <table>
         <tr>
         
@@ -178,9 +192,9 @@
 // ---- Tabs ----
 (function(){
   const config = [
+    {btn:'#tab-infer', panel:'#panel-infer'},
     {btn:'#tab-data',  panel:'#panel-data'},
     {btn:'#tab-train', panel:'#panel-train'},
-    {btn:'#tab-infer', panel:'#panel-infer'}
   ];
   function selectTab(idx){
     for(let i=0;i<config.length;i++){
@@ -193,7 +207,7 @@
     try{ if(typeof window.createTable==='function'){ window.createTable(); } }catch(e){ console.warn(e); }
   }
   // 初期表示
-  selectTab(0);
+  //selectTab(0);
   // クリックハンドラ
   config.forEach((t,idx)=>{
     const b = document.querySelector(t.btn);
