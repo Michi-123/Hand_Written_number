@@ -273,12 +273,12 @@ input[type="range"] {
 </style>
 </head>
 <body>
-V2
+
 <!-- Tab Navigation -->
 <div class="tab-container">
+    <button class="tab-button" onclick="showTab('prediction')">推論</button>
     <button class="tab-button active" onclick="showTab('data-creation')">データ作成</button>
     <button class="tab-button" onclick="showTab('training')">学習</button>
-    <button class="tab-button" onclick="showTab('prediction')">推論</button>
 </div>
 
 <!-- Data Creation Tab -->
@@ -322,7 +322,17 @@ V2
     </div>
     
     <div class="result-info">
-        損失: <span id="loss">-</span>
+        <div>損失: <span id="loss">-</span></div>
+        <div>精度: <span id="accuracy">-</span></div>
+        <div>学習データ数: <span id="data_count">0</span></div>
+        <div id="training_progress" style="display:none;">
+            <div style="margin-top: 10px;">
+                <div>学習中... <span id="epoch_progress">-</span></div>
+                <div style="background: #ddd; height: 10px; border-radius: 5px; margin-top: 5px;">
+                    <div id="progress_bar" style="background: #007bff; height: 100%; width: 0%; border-radius: 5px; transition: width 0.3s;"></div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -655,11 +665,33 @@ function clearBatch() {
     X_batch = [];
     T_batch = [];
     clearIndicators();
+    document.getElementById('data_count').textContent = '0';
+    document.getElementById('loss').textContent = '-';
+    document.getElementById('accuracy').textContent = '-';
 }
 
 function addCanvasData() {
     const selectedRadio = document.querySelector('input[name="num"]:checked');
-    if (!selectedRadio) return;
+    if (!selectedRadio) {
+        alert('学習する文字を選択してください');
+        return;
+    }
+    
+    // Check if canvas has content
+    const imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    const data = imageData.data;
+    let hasContent = false;
+    for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 0) {
+            hasContent = true;
+            break;
+        }
+    }
+    
+    if (!hasContent) {
+        alert('キャンバスに何か描画してください');
+        return;
+    }
     
     const num = selectedRadio.value;
     const indicator = document.querySelector(`.indicator.n${num}`);
@@ -675,7 +707,12 @@ function addCanvasData() {
     X_batch.push(getCanvasData());
     T_batch.push(t);
     
+    // Update data count display
+    document.getElementById('data_count').textContent = X_batch.length;
+    
     clearCanvas();
+    
+    console.log(`Added training sample for "${target[idx]}" (${X_batch.length} total samples)`);
 }
 
 function getCanvasData() {
@@ -700,107 +737,224 @@ function getCanvasData() {
 }
 
 // Neural Network Implementation
-var cW1 = [], cW2 = [], cb1 = [], cb2 = [];  // Convolutional weights and biases
-var W1 = [], b1 = [], W2 = [], b2 = [];     // Fully connected weights and biases
-var h1 = [], h2 = [], h_fn = [], h_dropout = [];
+var W1 = [], b1 = [], W2 = [], b2 = [];     // Network weights and biases
 var losses = [];
-var drop_rate = 0.5;
+var inputSize = 784;  // 28x28 flattened input
+var hiddenSize = 128; // Hidden layer size
 
-// Initialize with random weights
+// Initialize with random weights when page loads
 initializeWeights();
 
 function initializeWeights() {
-    // Initialize convolutional layers (simplified)
-    cW1 = createRandomMatrix(8, 1, 3, 3);  // 8 filters, 1 channel, 3x3
-    cW2 = createRandomMatrix(16, 8, 3, 3); // 16 filters, 8 channels, 3x3
-    cb1 = createRandomArray(8);
-    cb2 = createRandomArray(16);
+    // Xavier initialization for better training
+    const w1Scale = Math.sqrt(2.0 / inputSize);
+    const w2Scale = Math.sqrt(2.0 / hiddenSize);
     
-    // Initialize fully connected layers
-    W1 = createRandomMatrix(400, 128);  // Flattened conv output to hidden
-    b1 = createRandomArray(128);
-    W2 = createRandomMatrix(128, target.length);  // Hidden to output
-    b2 = createRandomArray(target.length);
+    // Initialize weights and biases
+    W1 = createRandomMatrix(inputSize, hiddenSize, w1Scale);
+    b1 = new Array(hiddenSize).fill(0);
+    W2 = createRandomMatrix(hiddenSize, target.length, w2Scale);
+    b2 = new Array(target.length).fill(0);
+    
+    console.log('Network initialized:', {
+        inputSize, hiddenSize, outputSize: target.length
+    });
 }
 
-function createRandomMatrix(...dimensions) {
-    if (dimensions.length === 2) {
-        const [rows, cols] = dimensions;
-        return Array(rows).fill().map(() => 
-            Array(cols).fill().map(() => (Math.random() - 0.5) * 0.2)
-        );
-    } else if (dimensions.length === 4) {
-        const [filters, channels, height, width] = dimensions;
-        return Array(filters).fill().map(() =>
-            Array(channels).fill().map(() =>
-                Array(height).fill().map(() =>
-                    Array(width).fill().map(() => (Math.random() - 0.5) * 0.2)
-                )
-            )
-        );
+function createRandomMatrix(rows, cols, scale = 0.1) {
+    return Array(rows).fill().map(() => 
+        Array(cols).fill().map(() => (Math.random() - 0.5) * 2 * scale)
+    );
+}
+
+// Forward pass through the network
+function forward(x, saveActivations = false) {
+    // Input to hidden layer
+    const z1 = matmul(x, W1, b1);
+    const a1 = relu(z1);
+    
+    // Hidden to output layer  
+    const z2 = matmul(a1, W2, b2);
+    const a2 = softmax(z2);
+    
+    if (saveActivations) {
+        return { z1, a1, z2, a2 };
+    }
+    return a2;
+}
+
+// Matrix multiplication with bias
+function matmul(x, W, b = null) {
+    const result = [];
+    for (let i = 0; i < W[0].length; i++) {
+        let sum = 0;
+        for (let j = 0; j < W.length; j++) {
+            sum += x[j] * W[j][i];
+        }
+        result[i] = sum + (b ? b[i] : 0);
+    }
+    return result;
+}
+
+// ReLU activation function
+function relu(x) {
+    return x.map(val => Math.max(0, val));
+}
+
+// ReLU derivative
+function reluDerivative(x) {
+    return x.map(val => val > 0 ? 1 : 0);
+}
+
+// Softmax activation function
+function softmax(x) {
+    const max = Math.max(...x);
+    const exp = x.map(val => Math.exp(val - max));
+    const sum = exp.reduce((a, b) => a + b, 0);
+    return exp.map(val => val / (sum + 1e-15)); // Add small epsilon to prevent division by zero
+}
+
+// Cross-entropy loss
+function crossEntropyLoss(predicted, target) {
+    let loss = 0;
+    for (let i = 0; i < predicted.length; i++) {
+        // Clip predicted values to prevent log(0)
+        const p = Math.max(1e-15, Math.min(1 - 1e-15, predicted[i]));
+        loss -= target[i] * Math.log(p);
+    }
+    return loss;
+}
+
+// Backpropagation algorithm
+function backward(x, target, activations, learningRate) {
+    const { z1, a1, z2, a2 } = activations;
+    
+    // Output layer gradients
+    const dL_da2 = [];
+    for (let i = 0; i < a2.length; i++) {
+        dL_da2[i] = a2[i] - target[i];
+    }
+    
+    // Gradients for W2 and b2
+    const dW2 = [];
+    const db2 = [...dL_da2];
+    
+    for (let i = 0; i < W2.length; i++) {
+        dW2[i] = [];
+        for (let j = 0; j < W2[i].length; j++) {
+            dW2[i][j] = a1[i] * dL_da2[j];
+        }
+    }
+    
+    // Hidden layer gradients
+    const dL_da1 = [];
+    for (let i = 0; i < a1.length; i++) {
+        let sum = 0;
+        for (let j = 0; j < dL_da2.length; j++) {
+            sum += dL_da2[j] * W2[i][j];
+        }
+        dL_da1[i] = sum;
+    }
+    
+    // Apply ReLU derivative
+    const dL_dz1 = [];
+    const reluDeriv = reluDerivative(z1);
+    for (let i = 0; i < dL_da1.length; i++) {
+        dL_dz1[i] = dL_da1[i] * reluDeriv[i];
+    }
+    
+    // Gradients for W1 and b1
+    const dW1 = [];
+    const db1 = [...dL_dz1];
+    
+    for (let i = 0; i < W1.length; i++) {
+        dW1[i] = [];
+        for (let j = 0; j < W1[i].length; j++) {
+            dW1[i][j] = x[i] * dL_dz1[j];
+        }
+    }
+    
+    // Update weights and biases
+    for (let i = 0; i < W1.length; i++) {
+        for (let j = 0; j < W1[i].length; j++) {
+            W1[i][j] -= learningRate * dW1[i][j];
+        }
+    }
+    
+    for (let i = 0; i < b1.length; i++) {
+        b1[i] -= learningRate * db1[i];
+    }
+    
+    for (let i = 0; i < W2.length; i++) {
+        for (let j = 0; j < W2[i].length; j++) {
+            W2[i][j] -= learningRate * dW2[i][j];
+        }
+    }
+    
+    for (let i = 0; i < b2.length; i++) {
+        b2[i] -= learningRate * db2[i];
     }
 }
 
-function createRandomArray(size) {
-    return Array(size).fill().map(() => (Math.random() - 0.5) * 0.1);
-}
-
-function predict(x, train) {
+function predict(x, train = false) {
     if (!x) {
         x = getCanvasData();
     }
     
-    // Simplified forward pass
-    let h = flattenInput(x[0]);  // Flatten 2D input to 1D
+    // Convert 2D input to flattened 1D array
+    const input = flattenInput(x[0]);
     
-    // First layer
-    h = affine(h, W1, b1);
-    h = relu(h);
-    
-    // Output layer
-    h = affine(h, W2, b2);
-    
-    const y = indexOfMax(h);
-    const maxVal = Math.max(...h);
-    const predicted = target[y] || '?';
+    // Forward pass
+    const output = forward(input);
+    const predicted_idx = indexOfMax(output);
+    const confidence = output[predicted_idx];
+    const predicted_char = target[predicted_idx] || '?';
     
     if (!train) {
-        console.log('predicted', predicted);
-        document.getElementById('predicted').textContent = predicted;
-        document.getElementById('hypothesis').textContent = maxVal.toFixed(3);
-        drawSoftmaxGraph(h);
+        console.log('Predicted:', predicted_char, 'Confidence:', confidence.toFixed(3));
+        document.getElementById('predicted').textContent = predicted_char;
+        document.getElementById('hypothesis').textContent = confidence.toFixed(3);
+        drawSoftmaxGraph(output.map(x => Math.log(x + 1e-15))); // Convert to log scale for visualization
     }
     
-    return h;
+    return output;
 }
 
 function flattenInput(input2D) {
     const flattened = [];
-    for (let i = 0; i < input2D.length; i++) {
-        for (let j = 0; j < input2D[i].length; j++) {
-            flattened.push(input2D[i][j]);
+    const size = 28; // Target 28x28 = 784 pixels
+    
+    // Resize input to 28x28 if needed
+    const resized = resizeInput(input2D, size);
+    
+    for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+            flattened.push(resized[i] && resized[i][j] ? resized[i][j] : 0);
         }
     }
     
-    // Pad or truncate to expected size
-    while (flattened.length < 400) flattened.push(0);
-    return flattened.slice(0, 400);
+    return flattened;
 }
 
-function affine(x, w, b) {
-    const out = [];
-    for (let i = 0; i < w.length; i++) {
-        let sum = 0;
-        for (let j = 0; j < w[i].length; j++) {
-            sum += x[j] * w[i][j];
-        }
-        out.push(sum + (b ? b[i] : 0));
+function resizeInput(input, targetSize) {
+    const inputHeight = input.length;
+    const inputWidth = input[0] ? input[0].length : 0;
+    
+    if (inputHeight === 0 || inputWidth === 0) {
+        return Array(targetSize).fill().map(() => Array(targetSize).fill(0));
     }
-    return out;
-}
-
-function relu(x) {
-    return x.map(val => Math.max(0, val));
+    
+    const resized = [];
+    for (let i = 0; i < targetSize; i++) {
+        resized[i] = [];
+        for (let j = 0; j < targetSize; j++) {
+            const srcI = Math.floor(i * inputHeight / targetSize);
+            const srcJ = Math.floor(j * inputWidth / targetSize);
+            resized[i][j] = input[srcI] && input[srcI][srcJ] ? input[srcI][srcJ] : 0;
+        }
+    }
+    
+    return resized;
 }
 
 function indexOfMax(arr) {
@@ -814,61 +968,104 @@ function indexOfMax(arr) {
     return maxIndex;
 }
 
-function softmax(arr) {
-    const max = Math.max(...arr);
-    const exp = arr.map(x => Math.exp(x - max));
-    const sum = exp.reduce((a, b) => a + b, 0);
-    return exp.map(x => x / sum);
-}
-
 function train() {
     if (X_batch.length === 0) {
         alert('訓練データがありません。まずデータを追加してください。');
         return;
     }
     
-    const epoch = parseInt(document.getElementById('epoch').value);
+    const epochs = parseInt(document.getElementById('epoch').value);
     const learningRate = parseFloat(document.getElementById('learning_rate').value);
+    
+    console.log(`Training started: ${epochs} epochs, ${X_batch.length} samples, LR: ${learningRate}`);
+    
+    // Show training progress
+    document.getElementById('training_progress').style.display = 'block';
+    document.getElementById('train_btn').disabled = true;
+    
+    const startTime = Date.now();
     let totalLoss = 0;
+    let bestAccuracy = 0;
     
-    console.log(`Training for ${epoch} epochs with ${X_batch.length} samples`);
+    // Run training epochs asynchronously to allow UI updates
+    let epoch = 0;
     
-    for (let e = 0; e < epoch; e++) {
+    function trainEpoch() {
         let epochLoss = 0;
+        let correct = 0;
+        
+        // Shuffle training data
+        const indices = Array.from({length: X_batch.length}, (_, i) => i);
+        for (let i = indices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
         
         for (let i = 0; i < X_batch.length; i++) {
-            const h = predict(X_batch[i], true);
-            const y = softmax(h);
+            const idx = indices[i];
+            const input = flattenInput(X_batch[idx][0]);
+            const target_vec = T_batch[idx];
             
-            // Simple loss calculation (cross-entropy approximation)
-            for (let j = 0; j < y.length; j++) {
-                const error = y[j] - T_batch[i][j];
-                epochLoss += Math.abs(error);
-                
-                // Simple weight update (gradient descent approximation)
-                for (let k = 0; k < W2[j].length; k++) {
-                    W2[j][k] -= learningRate * error * 0.01;
-                }
-                if (b2[j] !== undefined) {
-                    b2[j] -= learningRate * error * 0.01;
-                }
-            }
+            // Forward pass with activation saving
+            const activations = forward(input, true);
+            const predicted = activations.a2;
+            
+            // Calculate loss
+            const loss = crossEntropyLoss(predicted, target_vec);
+            epochLoss += loss;
+            
+            // Check accuracy
+            const pred_idx = indexOfMax(predicted);
+            const true_idx = indexOfMax(target_vec);
+            if (pred_idx === true_idx) correct++;
+            
+            // Backward pass
+            backward(input, target_vec, activations, learningRate);
         }
         
         epochLoss /= X_batch.length;
         totalLoss += epochLoss;
-        console.log(`Epoch ${e + 1}: Loss = ${epochLoss.toFixed(4)}`);
+        const accuracy = (correct / X_batch.length * 100);
+        bestAccuracy = Math.max(bestAccuracy, accuracy);
+        
+        // Update progress
+        const progress = ((epoch + 1) / epochs * 100);
+        document.getElementById('progress_bar').style.width = progress + '%';
+        document.getElementById('epoch_progress').textContent = `${epoch + 1}/${epochs}`;
+        document.getElementById('loss').textContent = epochLoss.toFixed(4);
+        document.getElementById('accuracy').textContent = accuracy.toFixed(1) + '%';
+        
+        console.log(`Epoch ${epoch + 1}/${epochs}: Loss = ${epochLoss.toFixed(4)}, Accuracy = ${accuracy.toFixed(1)}%`);
+        
+        epoch++;
+        
+        if (epoch < epochs) {
+            // Continue training with a small delay to allow UI updates
+            setTimeout(trainEpoch, 10);
+        } else {
+            // Training completed
+            const trainingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            const avgLoss = (totalLoss / epochs).toFixed(4);
+            
+            console.log(`Training completed in ${trainingTime}s. Average loss: ${avgLoss}, Best accuracy: ${bestAccuracy.toFixed(1)}%`);
+            
+            // Hide progress and re-enable training button
+            setTimeout(() => {
+                document.getElementById('training_progress').style.display = 'none';
+                document.getElementById('train_btn').disabled = false;
+            }, 1000);
+        }
     }
     
-    const avgLoss = totalLoss / epoch;
-    document.getElementById('loss').textContent = avgLoss.toFixed(4);
-    console.log(`Training completed. Average loss: ${avgLoss.toFixed(4)}`);
+    // Start training
+    trainEpoch();
 }
 
 function initWeights() {
-    if (!confirm("Are you sure initialize Weights?")) return;
+    if (!confirm("重みを初期化しますか？学習した内容が失われます。")) return;
     initializeWeights();
-    console.log('Weights initialized');
+    document.getElementById('loss').textContent = '-';
+    console.log('Weights reinitialized');
 }
 </script>
 
