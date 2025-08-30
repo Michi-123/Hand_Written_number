@@ -87,7 +87,7 @@
   <div class="workspace">
     <!-- Left: Canvas -->
     <section class="panel">
-      <h3 style="margin-top:0">手書き入力9</h3>
+      <h3 style="margin-top:0">手書き入力ｖ10</h3>
       <canvas id="canvas" width="280" height="280"></canvas>
       
     </section>
@@ -106,7 +106,7 @@
           </select>
           <button class="btn clear_canvas">消す</button>
           <button class="btn" id="add_btn">追加</button>
-          <button class="btn" id="clear_batch">消去</button>
+          <button class="btn" id="clear_batch">戻す</button>
         </div>
         <div class="classes-wrap" style="margin-top:8px">
           <table id="classes_data"><!-- JSで行を生成 --></table>
@@ -377,6 +377,60 @@
 $(function(){
   if(typeof createTable === 'function') createTable();
 });
+
+
+/* 直近の追加データを1件だけ取り消す（X_batch/T_batch の末尾を削除し、該当クラスのインジケータを1つ減らす） */
+(function(){
+  function classIndexFromOneHot(tv){
+    if (!tv) return -1;
+    for (let i = 0; i < tv.length; i++){
+      if (tv[i] === 1 || tv[i] === 1.0 || tv[i] == 1) return i; // 数値/文字どちらでもOK
+    }
+    return -1;
+  }
+
+  window.undoLastAdd = function(){
+    try{
+      if (!window.X_batch || !window.T_batch) return;
+      if (window.X_batch.length === 0) return;
+
+      // 末尾の one-hot からクラスを特定し、バッチを1件削除
+      const tvec = window.T_batch[window.T_batch.length - 1];
+      const idx  = classIndexFromOneHot(tvec);
+
+      window.X_batch.pop();
+      window.T_batch.pop();
+
+      // インジケータ（■の並び）を1つ減らす
+      if (idx >= 0){
+        const el = $('#classes_data .indicator.n' + idx);
+        if (el && el.length){
+          const block = String.fromCharCode(9609); // ■
+          let s = el.text() || '';
+          if (s.endsWith(block)) {
+            s = s.slice(0, -1);
+          } else if (s.length > 0 && s !== '\xa0') {
+            // 念のため最後の1文字を削る（ブロック以外が末尾にあるケース）
+            s = s.slice(0, -1);
+          }
+          if (s.length === 0) s = '\xa0'; // 空表示は &nbsp;
+          el.text(s);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 既存の「消去」クリックを上書きして「戻す」へ
+  $(function(){
+    const btn = $('#clear_batch');
+    if (btn.length){
+      btn.text('戻す').off('click').on('click', window.undoLastAdd);
+    }
+  });
+})();
+
 </script>
 
 </body>
