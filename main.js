@@ -13,13 +13,14 @@ $(function(){
   $('#predict_type').change(  function(){clearCanvas();changeLabel()})
   $('input[name=tab]').change(function(){changeTab()})
   $('#learning_rate_range').change(function(event){setLearningRate(this)})
+  $('#epoch_range').change(function(event){setEpoch(this)})
 
   $('#predict').click(        function(){predict()})
-  $('#clear_canvas').click(   function(){clearCanvas();clearGraph()})
+  $('.clear_canvas').click(   function(){clearCanvas();clearGraph()})
   $('#clear_batch').click(    function(){clearBatch()})
   $('#add_btn').click(        function(){addCanvasData()})
   $('#init_weights').click(   function(){initWeights()})
-  $('#train_btn').click(      function(){clearLoss(); train()})
+  $('#train_btn').click(      function(){train()})
 
   $('#radio').find('input:first').attr('checked', true)
 })
@@ -111,30 +112,56 @@ function setLearningRate(element){
   log(v)
   var rearningRate = 0.1
   switch (parseInt(v)){
+  case 0:
+    rearningRate = 0.01
+    break
+  case 1:
+    rearningRate = 0.05
+    break      
+  case 2:
+    rearningRate = 0.1
+    break
+  case 3:
+    rearningRate = 0.2
+    break
+  case 4:
+    rearningRate = 0.5
+    break
+  case 5:
+    rearningRate = 1.0
+    break
+  case 6:
+    rearningRate = 2.0
+    break
+  default:
+    log("default: " + v)
+    break
+  }
+  $('#learning_rate').val(rearningRate)
+}
+
+
+function setEpoch(element){
+
+  var v = $(element).val()
+  log(v)
+  var epoch = 1
+  switch (parseInt(v)){
     case 0:
-      rearningRate = 0.9
+      epoch = 1
       break
     case 1:
-      rearningRate = 0.5
+      epoch = 2
       break
     case 2:
-      rearningRate = 0.2
-      break
-    case 3:
-      rearningRate = 0.1
-      break
-    case 4:
-      rearningRate = 0.05
-      break      
-    case 5:
-      rearningRate = 0.01
+      epoch = 3
       break
     default:
       log("default: " + v)
       break
 
   }
-  $('#learning_rate').val(rearningRate)
+  $('#epoch').val(epoch)
 }
 
 
@@ -278,6 +305,3 @@ function initWeights(){
 
 function log(n){ console.log(n) }
 
-function clearLoss(){
-    D.getElementById('loss').innerHTML = "-";
-}
