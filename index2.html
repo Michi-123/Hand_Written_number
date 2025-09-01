@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hand written recognition (Mobile Tabs)</title>
+<style>
+  :root{
+    --pad: 10px;
+    --gap: 12px;
+    --radius: 10px;
+    /* Light theme */
+    --bg:    #f7f8fb;
+    --panel: #ffffff;
+    --line:  #d9dce5;
+    --text:  #1e2430;
+    --muted: #6b7280;
+    --accent:#2f7bff;
+    --ok:    #16a34a;
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;}
+  *{box-sizing:border-box}
+
+  /* ===== Top Tabs ===== */
+  .tabs{
+    position:sticky;top:0;z-index:5;
+    background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0));
+    padding:var(--pad) var(--pad) 0;
+  }
+  .tabbar{display:flex;gap:8px;}
+  .tabbar button{flex:1;appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:10px 12px;border-radius:999px;font-weight:600}
+  .tabbar button[aria-selected="true"]{outline:2px solid var(--accent);}
+
+  main{padding:var(--pad);}
+
+  /* ===== Canvas & Controls ===== */
+  .workspace{display:grid;grid-template-columns:1fr;gap:var(--gap);}
+  @media (min-width: 900px){
+    .workspace{grid-template-columns: 320px 1fr;align-items:start}
+  }
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:var(--pad)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  label.inline{font-size:14px;color:var(--muted)}
+  input[type="number"], input[type="text"], input[type="range"], select{
+    background:#fff; color:var(--text);
+    border:1px solid var(--line); border-radius:8px; padding:6px 8px;
+  }
+  input[type="range"]{width:180px}
+  .btn{
+    appearance:none; border:1px solid var(--line);
+    background:#fff; color:var(--text);
+    padding:8px 12px; border-radius:10px; font-weight:600;
+  }
+  .btn.ok{ border-color:#22c55e; }
+
+  /* Canvas */
+  #canvas{background:#fff;border:1px solid #aaa;border-radius:8px;touch-action:none;display:block;width:min(92vw, 360px);height:min(92vw, 360px)}
+
+  /* Classes table (horizontal like table1) */
+  .classes-wrap{overflow:auto}
+  table#classes_data, table#classes_pred{width:100%;border-collapse:collapse}
+  table#classes_data td, table#classes_pred td, table#classes_data th, table#classes_pred th{border-bottom:1px solid var(--line);padding:8px}
+  table#classes_data tr:hover, table#classes_pred tr:hover{background:#f3f6fb}
+  td.cell{width:42px;text-align:center;font-weight:700}
+  td.graph{min-width:160px}
+  .bar{height:12px;background:var(--ok);border-radius:6px}
+  td.indicator{color:#f99;white-space:nowrap}
+
+  /* Result area */
+  #predicted{background:#fff;color:#222;width:70px;height:70px;text-align:center;font-size:60px;border:1px solid #ccc;border-radius:10px;display:flex;align-items:center;justify-content:center}
+  #hypothesis{min-height:24px;color:var(--muted)}
+
+
+
+  /* 既定（未選択）タブの見た目 */
+  .tabbar [role="tab"]{
+    background: #fff;                 /* ライト基調 */
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-weight: 600;
+  }
+
+  /* 選択中タブ：枠色＝背景色、文字は白 */
+  .tabbar [role="tab"][aria-selected="true"]{
+    background: var(--accent);        /* 枠と同じ色に */
+    border-color: var(--accent);
+    color: #fff;                      /* 文字を白に */
+  }
+
+  /* キーボード操作時の見やすさ(任意) */
+  .tabbar [role="tab"]:focus-visible{
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+
+
+/* データ作成タブの一覧：列幅を固定してズレ防止 */
+#panel-data table#classes_data{
+  table-layout: fixed;   /* 列幅を固定配分 */
+  width: 100%;
+}
+
+/* 1列目：ラジオボタン（最小幅で固定） */
+#panel-data table#classes_data td.radio_button{
+  width: 10%;             /* 最小限を確保 */
+  min-width: 36px;
+  text-align: center;
+  padding-right: 4px;
+}
+
+/*
+#panel-data table#classes_data td.radio_button input[type="radio"]{
+  display: block;
+  margin: 0 auto;
+}
+*/
+
+/* 2列目：クラス名（左寄せ＆固定幅） */
+#panel-data table#classes_data td.cell{
+  text-align: left !important;  /* 既存 .cell{text-align:center} を上書き */
+  width: 30px;                  /* クラス名の横幅を固定 64px;*/
+  /*min-width: 64px;*/
+  padding-left: 8px;
+}
+
+/* 3列目：インジケータ（残り幅を使用） */
+#panel-data table#classes_data td.indicator{
+  white-space: nowrap;   /* 折り返さず横に伸ばす（他列を巻き込まない） */
+}
+
+/* 画面が狭いときに横スクロール許可（任意） */
+#panel-data.panel{
+  overflow-x: auto;
+}
+
+/* スマホアプリ風ボタンスタイルの追加CSS - 既存のstyleタグ内に追加してください */
+
+/* ===== モバイルアプリ風ボタンデザイン ===== */
+
+/* 基本ボタンスタイルの強化 */
+.btn {
+  appearance: none;
+  border: none !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  padding: 12px 20px !important;
+  border-radius: 25px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4) !important;
+}
+
+.btn:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+}
+
+/* OKボタン（緑系） */
+.btn.ok {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+  box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+}
+
+.btn.ok:hover {
+  box-shadow: 0 8px 25px rgba(79, 172, 254, 0.4) !important;
+}
+
+/* Clear/削除系ボタン（オレンジ系） */
+.btn.clear_canvas, 
+button[class*="clear"] {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%) !important;
+  color: #8b4513 !important;
+  box-shadow: 0 4px 15px rgba(252, 182, 159, 0.3);
+}
+
+.btn.clear_canvas:hover,
+button[class*="clear"]:hover {
+  box-shadow: 0 8px 25px rgba(252, 182, 159, 0.4) !important;
+}
+
+/* 特殊ボタン: 戻すボタン */
+#clear_batch {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%) !important;
+  color: #555 !important;
+  box-shadow: 0 4px 15px rgba(168, 237, 234, 0.3);
+}
+
+#clear_batch:hover {
+  box-shadow: 0 8px 25px rgba(168, 237, 234, 0.4) !important;
+}
+
+/* タブボタンのモバイル風強化 */
+.tabbar [role="tab"] {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: var(--text) !important;
+  border: none !important;
+  border-radius: 20px !important;
+  padding: 12px 16px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tabbar [role="tab"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.tabbar [role="tab"][aria-selected="true"] {
+  background: linear-gradient(135deg, var(--accent) 0%, #4facfe 100%) !important;
+  color: white !important;
+  box-shadow: 0 4px 15px rgba(47, 123, 255, 0.4);
+  transform: scale(1.05);
+}
+
+.tabbar [role="tab"][aria-selected="true"]:hover {
+  box-shadow: 0 6px 20px rgba(47, 123, 255, 0.5) !important;
+}
+
+/* フォーム要素のモバイル風強化 */
+input[type="number"], 
+input[type="text"], 
+select {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 2px solid rgba(209, 213, 219, 0.3) !important;
+  border-radius: 15px !important;
+  padding: 10px 12px !important;
+  font-size: 14px !important;
+  transition: all 0.3s ease;
+  min-height: 40px;
+  backdrop-filter: blur(5px);
+}
+
+input[type="number"]:focus,
+input[type="text"]:focus,
+select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(47, 123, 255, 0.1);
+  outline: none;
+  transform: scale(1.02);
+}
+
+/* カラーピッカーのモバイル風強化 */
+input[type="color"] {
+  width: 44px !important;
+  height: 44px !important;
+  border: 3px solid white !important;
+  border-radius: 50% !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+input[type="color"]:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* レンジスライダーの強化 */
+input[type="range"] {
+  appearance: none;
+  background: transparent;
+  height: 6px !important;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #e5e7eb 0%, var(--accent) 100%);
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 12px rgba(47, 123, 255, 0.3);
+}
+
+/* 予測結果表示エリアの強化 */
+#predicted {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 20px !important;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+  font-weight: 700 !important;
+  transition: all 0.3s ease;
+}
+
+/* パネルの強化 */
+.panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: none !important;
+  border-radius: 20px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(20px);
+  transition: all 0.3s ease;
+}
+
+.panel:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* テーブルの強化 */
+table#classes_data, 
+table#classes_pred {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+table#classes_data tr:hover, 
+table#classes_pred tr:hover {
+  background: linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, rgba(79, 172, 254, 0.05) 100%) !important;
+  transform: scale(1.02);
+  transition: all 0.3s ease;
+}
+
+/* ラジオボタンの強化 */
+input[type="radio"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #d1d5db;
+  border-radius: 50%;
+  background: white;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+input[type="radio"]:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47, 123, 255, 0.2);
+}
+
+input[type="radio"]:checked::after {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
+  margin: 4px auto;
+}
+
+/* キャンバスの強化 */
+#canvas {
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+#canvas:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* モバイル最適化 */
+@media (max-width: 768px) {
+  .btn {
+    padding: 14px 20px !important;
+    font-size: 16px !important;
+    min-height: 48px;
+  }
+  
+  .tabbar [role="tab"] {
+    padding: 14px 12px !important;
+    font-size: 14px !important;
+    min-height: 48px;
+  }
+  
+  input[type="color"] {
+    width: 48px !important;
+    height: 48px !important;
+  }
+  
+  input[type="number"], 
+  input[type="text"], 
+  select {
+    min-height: 44px;
+    font-size: 16px !important;
+  }
+}
+
+/* アニメーション効果の追加 */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+</style>
+</head>
+<body>
+
+<!-- タブ見出し（順番と既定選択を変更） -->
+<div class="tabs" role="tablist" aria-label="handwrite tabs">
+  <div class="tabbar">
+    <button id="tab-infer" role="tab" aria-controls="panel-infer" aria-selected="true">推論</button>
+    <button id="tab-data"  role="tab" aria-controls="panel-data"  aria-selected="false">データ作成</button>
+    <button id="tab-train" role="tab" aria-controls="panel-train" aria-selected="false">学習</button>
+  </div>
+</div>
+
+<main>
+  <div class="workspace">
+    <!-- Left: Canvas -->
+    <section class="panel">
+      <canvas id="canvas" width="280" height="280"></canvas>
+      
+    </section>
+
+    <!-- Right: Tabs content -->
+    <section>
+      <!-- データ作成 / 学習 / 推論 の各パネル -->
+      <div id="panel-data" class="panel" role="tabpanel" hidden aria-labelledby="tab-data">
+        <div class="row">
+          <label class="inline">種別</label>
+          <select id="predict_type">
+            <option value="0">数字</option>
+            <option value="1">ABC</option>
+            <option value="2">かな</option>
+            <option value="3">記号</option>
+          </select>
+          <button class="btn clear_canvas">消す</button>
+          <button class="btn" id="add_btn">追加</button>
+          <button class="btn" id="clear_batch">戻す</button>
+        </div>
+        <div class="classes-wrap" style="margin-top:8px">
+          <table id="classes_data"><!-- JSで行を生成 --></table>
+        </div>
+      </div>
+
+<div id="panel-train" class="panel" role="tabpanel" hidden aria-labelledby="tab-train">
+  <h3 style="margin-top:0">学習</h3>
+
+  <!-- 1列目：初期化 ＆ 学習開始 -->
+  <div class="row">
+    <button class="btn" id="init_weights">初期化</button>
+    <button class="btn ok" id="train_btn">学習開始</button> <!-- ← 学習 → 学習開始 -->
+  </div>
+
+  <!-- 2列目：学習率（テキスト＋スライダー） -->
+  <div class="row" style="margin-top:8px">
+    <label class="inline">学習率</label>
+    <input id="learning_rate" value="0.1" style="width:80px;text-align:right">
+    <input type="range" id="learning_rate_range" min="0" max="6">
+  </div>
+
+  <!-- 3列目：学習回数（テキスト＋スライダー） -->
+  <div class="row" style="margin-top:8px">
+    <label class="inline">学習回数</label> <!-- ← エポック → 学習回数 -->
+    <input id="epoch" value="1" style="width:60px;text-align:right">
+    <input type="range" id="epoch_range" min="0" max="2" value="0">
+  </div>
+
+  <div class="row" style="margin-top:8px">
+    <label class="inline">損失:</label>
+    <span id="loss"></span>
+  </div>
+</div>
+
+
+      <!-- タブパネル（推論を表示、他は非表示に） -->
+      <div id="panel-infer" class="panel" role="tabpanel" aria-labelledby="tab-infer">
+        <table>
+        <tr>
+        
+        <td>
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">予測結果</div>
+            <div id="predicted">&nbsp;</div>
+          </div>
+        </td>
+
+        <td>
+          <div class="row">
+            <input type="color" id="pen_color" value="#00cc00"/>
+            <input type="color" id="color" value="#00cc00" style="display:none"/>
+            <br>
+            <button class="btn ok" id="predict">予測</button>
+            <button class="btn clear_canvas">消す</button>
+          </div>
+        </td>
+        </tr>
+        </table>
+
+        <table>
+        <tr>
+        <div class="row" style="margin-top:12px">
+          <div style="margin-left:18px;min-width:200px">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">強さ</div>
+            <div id="hypothesis" style="display:none"></div>
+
+            <div class="classes-wrap" style="margin-top:8px">
+              <table id="classes_pred"><!-- JSで行を生成 --></table>
+            </div>
+        </div>
+        
+        </tr>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ====== Scripts (original assets) ====== -->
+<script src="jquery.js"></script>
+<script src="data/cW1.js"></script>
+<script src="data/cW2.js"></script>
+<script src="data/cb1.js"></script>
+<script src="data/cb2.js"></script>
+<script src="data/W1.js"></script>
+<script src="data/b1.js"></script>
+<script src="data/W2.js"></script>
+<script src="data/b2.js"></script>
+<script src="network.js"></script>
+<script src="canvas.js"></script>
+<script src="main.js"></script>
+
+<!-- ====== Overrides / Mobile enhancements ====== -->
+<script>
+// ---- Tabs ----
+(function(){
+  const config = [
+    {btn:'#tab-infer', panel:'#panel-infer'},
+    {btn:'#tab-data',  panel:'#panel-data'},
+    {btn:'#tab-train', panel:'#panel-train'},
+  ];
+  function selectTab(idx){
+    for(let i=0;i<config.length;i++){
+      const b = document.querySelector(config[i].btn);
+      const p = document.querySelector(config[i].panel);
+      if(b){ b.setAttribute('aria-selected', i===idx ? 'true' : 'false'); }
+      if(p){ p.hidden = (i!==idx); }
+    }
+    // 必要なテーブルが無ければ再生成（タブ切替時の初期化用）
+    try{ if(typeof window.createTable==='function'){ window.createTable(); } }catch(e){ console.warn(e); }
+  }
+  // 初期表示
+  //selectTab(0);
+  // クリックハンドラ
+  config.forEach((t,idx)=>{
+    const b = document.querySelector(t.btn);
+    if(b){ b.addEventListener('click', function(){ selectTab(idx); }); }
+  });
+})();
+
+// ---- Keep legacy #color in sync with #pen_color ----
+(function(){
+  const pen = document.getElementById('pen_color');
+  const legacy = document.getElementById('color');
+  function sync(){ legacy.value = pen.value; }
+  pen.addEventListener('input', sync);
+  sync();
+})();
+
+// ---- Canvas: add touch/pointer support + coordinate scaling ----
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let drawing = false, bx=0, by=0;
+  function toCanvasXY(e){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = (e.touches? e.touches[0].clientX : e.clientX);
+    const clientY = (e.touches? e.touches[0].clientY : e.clientY);
+    return {x:(clientX - rect.left)*scaleX, y:(clientY - rect.top)*scaleY};
+  }
+  function pen(){ return document.getElementById('pen_color').value || '#000000'; }
+  function drawLine(x,y){
+    ctx.lineCap='round';
+    ctx.strokeStyle=pen();
+    ctx.lineWidth=10;
+    ctx.beginPath();
+    ctx.moveTo(bx,by);
+    ctx.lineTo(x,y);
+    ctx.stroke();
+    ctx.closePath();
+    bx=x; by=y;
+  }
+  function down(e){ e.preventDefault(); drawing=true; const p=toCanvasXY(e); bx=p.x; by=p.y; }
+  function move(e){ if(!drawing) return; e.preventDefault(); const p=toCanvasXY(e); drawLine(p.x,p.y); }
+  function up(e){ drawing=false; }
+
+  // Pointer if available
+  if(window.PointerEvent){
+    canvas.addEventListener('pointerdown', down, {passive:false});
+    canvas.addEventListener('pointermove', move, {passive:false});
+    canvas.addEventListener('pointerup', up, {passive:false});
+    canvas.addEventListener('pointerleave', up, {passive:false});
+  } else {
+    // Touch + Mouse fallback
+    canvas.addEventListener('touchstart', down, {passive:false});
+    canvas.addEventListener('touchmove', move, {passive:false});
+    canvas.addEventListener('touchend', up, {passive:false});
+    canvas.addEventListener('mousedown', down);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', up);
+  }
+})();
+
+// ---- Tables generator: split for Data (作成) and Inference (推論) ----
+(function(){
+  function createDataTable(){
+    const table = $('#classes_data');
+    if(!table.length) return;
+    table.empty();
+    for(let i=0;i<target.length;i++){
+      const row = $(`
+        <tr>
+          <td class="radio_button"><input type="radio" name="num" value="${i}" ${i===0?'checked':''}></td>
+          <td class="cell cellnum${i}">${target[i]}</td>
+          <td class="indicator n${i}">&nbsp;</td>
+        </tr>`);
+      table.append(row);
+    }
+  }
+  function createPredTable(){
+    const table = $('#classes_pred');
+    if(!table.length) return;
+    table.empty();
+    for(let i=0;i<target.length;i++){
+      const row = $(`
+        <tr>
+          <td class="cell cellnum${i}">${target[i]}</td>
+          <td class="graph n${i}"></td>
+        </tr>`);
+      table.append(row);
+    }
+  }
+  window.createTable = function(){
+    createDataTable();
+    createPredTable();
+  };
+})();
+
+// ---- Update drawSoftmaxGraph & addCanvasData selectors to new table ----
+(function(){
+  // keep original functions around if needed
+  const _drawSoftmaxGraph = window.drawSoftmaxGraph;
+  window.drawSoftmaxGraph = function(h){
+    try{
+      const s = softmax(h);
+      // clear
+      $('#classes_pred .graph').html('');
+      for(let i=0; i<s.length; i++){
+        const px = Math.max(1, Math.floor(s[i]*300));
+        const row = $('#classes_pred .graph.n'+i);
+        if(row && row.length){ row.html(`<div class="bar" style="width:${px}px"></div>`); }
+      }
+    }catch(e){ console.warn('drawSoftmaxGraph skipped:', e); }
+  };
+
+  const _addCanvasData = window.addCanvasData;
+  window.addCanvasData = function(){
+    try{
+      const num = $('input[name=num]:checked').val();
+      const el = $('#classes_data .indicator.n'+num);
+      if(el && el.length){
+        const t = (el.text()||'') + String.fromCharCode(9609);
+        el.text(t);
+      }
+      // One-hot
+      const C = (Array.isArray(window.W2) && Array.isArray(window.W2[0])) ? window.W2.length : target.length; const tvec = []; for(let i=0;i<C;i++){ tvec[i]=0; }
+      tvec[num] = 1;
+      X_batch.push(getCanvasData());
+      T_batch.push(tvec);
+      clearCanvas();
+    }catch(e){ console.warn('addCanvasData skipped:', e); }
+  };
+})();
+
+// ---- Clear buttons bind (works with original .clear_canvas handler in main.js) ----
+(function(){
+  $('.clear_canvas').on('click', function(){
+    try { clearCanvas(); } catch(e){}
+    $('#classes_pred .graph').empty();
+  });
+})();
+
+// ---- Adapt output head to current class set & clear batches on label change ----
+(function(){
+  const _changeLabel = window.changeLabel;
+  window.changeLabel = function(){
+    if (typeof _changeLabel === 'function') _changeLabel();
+    try{
+      const C = (Array.isArray(window.target)? window.target.length : 0);
+      if (Array.isArray(window.W2) && Array.isArray(window.W2[0]) && C>0){
+        const D = window.W2[0].length;
+        if (window.W2.length !== C){
+          // rebuild last affine to match classes
+          window.W2 = Array.from({length: C}, ()=> Array.from({length: D}, ()=> random_normal()));
+          window.b2 = Array.from({length: C}, ()=> 0.0);
+        }
+      }
+    }catch(e){ console.warn('resizeOutputHead failed', e); }
+    // Clear minibatch buffers to avoid mixed-dimension targets
+    if (window.X_batch) window.X_batch.length = 0;
+    if (window.T_batch) window.T_batch.length = 0;
+    // Rebuild tables for new target set
+    if (typeof window.createTable === 'function') window.createTable();
+  };
+})();
+
+// Initialize dynamic table after assets load
+$(function(){
+  if(typeof createTable === 'function') createTable();
+});
+
+
+/* 直近の追加データを1件だけ取り消す（X_batch/T_batch の末尾を削除し、該当クラスのインジケータを1つ減らす） */
+(function(){
+  function classIndexFromOneHot(tv){
+    if (!tv) return -1;
+    for (let i = 0; i < tv.length; i++){
+      if (tv[i] === 1 || tv[i] === 1.0 || tv[i] == 1) return i; // 数値/文字どちらでもOK
+    }
+    return -1;
+  }
+
+  window.undoLastAdd = function(){
+    try{
+      if (!window.X_batch || !window.T_batch) return;
+      if (window.X_batch.length === 0) return;
+
+      // 末尾の one-hot からクラスを特定し、バッチを1件削除
+      const tvec = window.T_batch[window.T_batch.length - 1];
+      const idx  = classIndexFromOneHot(tvec);
+
+      window.X_batch.pop();
+      window.T_batch.pop();
+
+      // インジケータ（■の並び）を1つ減らす
+      if (idx >= 0){
+        const el = $('#classes_data .indicator.n' + idx);
+        if (el && el.length){
+          const block = String.fromCharCode(9609); // ■
+          let s = el.text() || '';
+          if (s.endsWith(block)) {
+            s = s.slice(0, -1);
+          } else if (s.length > 0 && s !== '\xa0') {
+            // 念のため最後の1文字を削る（ブロック以外が末尾にあるケース）
+            s = s.slice(0, -1);
+          }
+          if (s.length === 0) s = '\xa0'; // 空表示は &nbsp;
+          el.text(s);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 既存の「消去」クリックを上書きして「戻す」へ
+  $(function(){
+    const btn = $('#clear_batch');
+    if (btn.length){
+      btn.text('戻す').off('click').on('click', window.undoLastAdd);
+    }
+  });
+})();
+
+
+
+/* --- データ作成タブに戻ったとき、インジケーター（■）を復元する --- */
+(function(){
+  function classIndexFromOneHot(tv){
+    if (!tv) return -1;
+    if (Array.isArray(tv)){
+      for (let i=0;i<tv.length;i++){
+        if (tv[i] === 1 || tv[i] === 1.0) return i;
+      }
+      return -1;
+    }
+    if (typeof tv === 'number') return tv|0;         // 念のため整数ラベルにも対応
+    if (typeof tv === 'object' && 'label' in tv) return tv.label|0;
+    return -1;
+  }
+
+  window.rebuildIndicatorsFromBatch = function(){
+    const table = $('#classes_data');
+    if (!table.length) return;
+
+    // 現在の表行数（= クラス数）を取得
+    const n = table.find('tr').length;
+    if (!n) return;
+
+    // いったんクリア
+    table.find('td.indicator').text('\xa0'); // &nbsp;
+
+    // T_batch から件数カウント
+    const T = (window.T_batch || []);
+    const counts = new Array(n).fill(0);
+    for (let i=0;i<T.length;i++){
+      const idx = classIndexFromOneHot(T[i]);
+      if (idx >= 0 && idx < n) counts[idx]++;
+    }
+
+    // ■ を再描画
+    const block = String.fromCharCode(9609); // ■
+    counts.forEach((c, idx)=>{
+      const el = table.find('.indicator.n' + idx);
+      el.text(c > 0 ? block.repeat(c) : '\xa0');
+    });
+  };
+
+  // 「データ作成」タブをクリックした後に復元
+  $(function(){
+    $('#tab-data').on('click', function(){
+      // 先に既存の selectTab() が createTable() を実行するので、その後に復元
+      setTimeout(function(){ window.rebuildIndicatorsFromBatch(); }, 0);
+    });
+
+    // ページ初期表示で「データ作成」タブが開いている場合も復元
+    const panelData = document.querySelector('#panel-data');
+    if (panelData && !panelData.hidden){
+      setTimeout(function(){ window.rebuildIndicatorsFromBatch(); }, 0);
+    }
+  });
+})();
+
+
+
+
+/* 「学習」タブ選択時はキャンバスの入っている <section> を非表示 */
+(function(){
+  function getCanvasSection(){
+    const c = document.getElementById('canvas');
+    return c ? c.closest('section') : null;  // 見出しごと隠す
+  }
+  function updateCanvasVisibility(){
+    const trainTab = document.getElementById('tab-train');
+    const isTrain = trainTab && trainTab.getAttribute('aria-selected') === 'true';
+    const sec = getCanvasSection();
+    if (sec){
+      sec.style.display = isTrain ? 'none' : '';
+    }
+  }
+  function bindTab(id){
+    const el = document.getElementById(id);
+    if (el){
+      // タブクリック後にaria-selectedが切り替わる可能性があるのでsetTimeoutで後追い
+      el.addEventListener('click', () => setTimeout(updateCanvasVisibility, 0));
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    bindTab('tab-data');
+    bindTab('tab-infer');
+    bindTab('tab-train');
+    updateCanvasVisibility();
+
+    // 他スクリプトからaria-selectedが変更された場合にも追従
+    const trainTab = document.getElementById('tab-train');
+    if (trainTab){
+      new MutationObserver(updateCanvasVisibility)
+        .observe(trainTab, { attributes: true, attributeFilter: ['aria-selected'] });
+    }
+  });
+})();
+
+
+</script>
+
+</body>
+</html>
