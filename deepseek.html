@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手書き数字認識</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            font-size: 1.8rem;
+        }
+        
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        #canvas {
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            background-color: #000;
+            touch-action: none;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 50px;
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+            font-size: 1rem;
+        }
+        
+        button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        #clearBtn {
+            background: #e74c3c;
+        }
+        
+        #clearBtn:hover {
+            background: #c0392b;
+        }
+        
+        .result-container {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .result {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        
+        .confidence {
+            font-size: 1.2rem;
+            color: #7f8c8d;
+        }
+        
+        .instructions {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .instructions ul {
+            padding-left: 20px;
+        }
+        
+        /* スマホ用スタイル */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            #canvas {
+                width: 280px;
+                height: 280px;
+            }
+            
+            button {
+                padding: 10px 15px;
+                min-width: 100px;
+                font-size: 0.9rem;
+            }
+            
+            .result {
+                font-size: 2rem;
+            }
+            
+            .confidence {
+                font-size: 1rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.3rem;
+            }
+            
+            #canvas {
+                width: 250px;
+                height: 250px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            button {
+                width: 100%;
+                max-width: 250px;
+            }
+            
+            .result {
+                font-size: 1.8rem;
+            }
+        }
+        
+        /* 描画インジケーター */
+        .drawing-indicator {
+            display: none;
+            margin-top: 10px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>手書き数字認識</h1>
+        
+        <div class="canvas-container">
+            <canvas id="canvas" width="280" height="280"></canvas>
+            <p class="drawing-indicator" id="drawingIndicator">描画中...</p>
+        </div>
+        
+        <div class="button-group">
+            <button id="predictBtn">認識</button>
+            <button id="clearBtn">クリア</button>
+        </div>
+        
+        <div class="result-container">
+            <h2>認識結果</h2>
+            <div class="result" id="result">-</div>
+            <div class="confidence" id="confidence">確信度: -</div>
+        </div>
+        
+        <div class="instructions">
+            <h3>使い方</h3>
+            <ul>
+                <li>キャンバスに指またはマウスで数字を描いてください</li>
+                <li>「認識」ボタンを押すとAIが数字を推測します</li>
+                <li>「クリア」ボタンでキャンバスを消去できます</li>
+                <li>数字はできるだけ大きくはっきり描くほど精度が上がります</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // キャンバスとコンテキストの設定
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const drawingIndicator = document.getElementById('drawingIndicator');
+        
+        // 描画状態の変数
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        
+        // キャンバスの初期化
+        function initCanvas() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 15;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = 'white';
+        }
+        
+        // 描画開始
+        function startDrawing(e) {
+            isDrawing = true;
+            drawingIndicator.style.display = 'block';
+            [lastX, lastY] = getPosition(e);
+        }
+        
+        // 描画中
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            
+            const [x, y] = getPosition(e);
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            
+            [lastX, lastY] = [x, y];
+        }
+        
+        // 描画終了
+        function stopDrawing() {
+            isDrawing = false;
+            drawingIndicator.style.display = 'none';
+        }
+        
+        // タッチ/マウス位置の取得
+        function getPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            
+            if (e.type.includes('touch')) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            return [
+                clientX - rect.left,
+                clientY - rect.top
+            ];
+        }
+        
+        // キャンバスクリア
+        function clearCanvas() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('result').textContent = '-';
+            document.getElementById('confidence').textContent = '確信度: -';
+        }
+        
+        // 数字認識
+        async function predictDigit() {
+            // キャンバスから画像データを取得
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // 前処理: グレースケール化とリサイズ
+            const processed = preprocessImage(imageData);
+            
+            // モデルのロードと予測
+            try {
+                const model = await tf.loadLayersModel('https://your-model-url/model.json');
+                const prediction = model.predict(processed);
+                const digit = prediction.argMax(1).dataSync()[0];
+                const confidence = prediction.max(1).dataSync()[0];
+                
+                // 結果表示
+                document.getElementById('result').textContent = digit;
+                document.getElementById('confidence').textContent = `確信度: ${(confidence * 100).toFixed(2)}%`;
+                
+                // メモリ解放
+                processed.dispose();
+                prediction.dispose();
+            } catch (error) {
+                console.error('モデルの読み込みに失敗しました:', error);
+                document.getElementById('result').textContent = 'エラー';
+                document.getElementById('confidence').textContent = 'モデルを読み込めません';
+            }
+        }
+        
+        // 画像前処理
+        function preprocessImage(imageData) {
+            return tf.tidy(() => {
+                // 画像データをテンソルに変換
+                let tensor = tf.browser.fromPixels(imageData, 1);
+                
+                // リサイズ
+                tensor = tf.image.resizeBilinear(tensor, [28, 28]);
+                
+                // 正規化
+                tensor = tensor.toFloat().div(255.0);
+                
+                // バッチ次元を追加
+                return tensor.expandDims(0);
+            });
+        }
+        
+        // イベントリスナーの設定
+        function setupEventListeners() {
+            // マウスイベント
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            
+            // タッチイベント
+            canvas.addEventListener('touchstart', startDrawing);
+            canvas.addEventListener('touchmove', draw);
+            canvas.addEventListener('touchend', stopDrawing);
+            
+            // ボタンイベント
+            document.getElementById('predictBtn').addEventListener('click', predictDigit);
+            document.getElementById('clearBtn').addEventListener('click', clearCanvas);
+            
+            // タッチデバイスでのスクロール防止
+            canvas.addEventListener('touchmove', function(e) {
+                if (isDrawing) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
+        
+        // 初期化
+        function init() {
+            initCanvas();
+            setupEventListeners();
+            
+            // タッチデバイス検出
+            if ('ontouchstart' in window) {
+                document.body.classList.add('touch-device');
+            }
+        }
+        
+        // アプリ起動
+        window.onload = init;
+    </script>
+</body>
+</html>
