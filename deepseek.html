@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>手書き数字認識</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mnist@1.0.2/dist/mnist.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -15,71 +16,88 @@
         
         body {
             background: linear-gradient(135deg, #6e8efb, #a777e3);
+            color: #333;
             min-height: 100vh;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
-            color: #333;
+            justify-content: center;
         }
         
         .container {
             width: 100%;
             max-width: 800px;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-            padding: 20px;
-            margin: 20px 0;
+            padding: 25px;
+            text-align: center;
         }
         
         h1 {
-            text-align: center;
+            font-size: 2.2rem;
             margin-bottom: 20px;
-            color: #2c3e50;
-            font-size: 1.8rem;
+            color: #4a4a4a;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+        
+        .description {
+            margin-bottom: 25px;
+            color: #666;
+            line-height: 1.6;
+            font-size: 1.1rem;
         }
         
         .canvas-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 20px;
+            position: relative;
+            width: 100%;
+            margin: 0 auto 25px;
+            touch-action: none;
         }
         
         #canvas {
-            border: 2px solid #3498db;
+            background-color: black;
             border-radius: 10px;
-            background-color: #000;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
             touch-action: none;
-            margin-bottom: 15px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            aspect-ratio: 1 / 1;
         }
         
-        .button-group {
+        .buttons {
             display: flex;
             justify-content: center;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 15px;
+            margin-bottom: 25px;
             flex-wrap: wrap;
         }
         
         button {
-            padding: 12px 20px;
+            padding: 12px 25px;
             border: none;
             border-radius: 50px;
-            background: #3498db;
+            background: linear-gradient(to right, #6e8efb, #a777e3);
             color: white;
+            font-size: 1rem;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s ease;
-            min-width: 120px;
-            font-size: 1rem;
+            box-shadow: 0 4px 10px rgba(106, 142, 251, 0.4);
+            min-width: 140px;
         }
         
         button:hover {
-            background: #2980b9;
             transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(106, 142, 251, 0.6);
         }
         
         button:active {
@@ -87,303 +105,271 @@
         }
         
         #clearBtn {
-            background: #e74c3c;
+            background: linear-gradient(to right, #ff7e5f, #feb47b);
+            box-shadow: 0 4px 10px rgba(254, 180, 123, 0.4);
         }
         
         #clearBtn:hover {
-            background: #c0392b;
+            box-shadow: 0 6px 15px rgba(254, 180, 123, 0.6);
         }
         
-        .result-container {
-            text-align: center;
-            padding: 15px;
+        .result {
             background: #f8f9fa;
-            border-radius: 10px;
+            padding: 20px;
+            border-radius: 15px;
             margin-bottom: 20px;
             box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
         }
         
-        .result {
-            font-size: 2.5rem;
+        .result h2 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #4a4a4a;
+        }
+        
+        #prediction {
+            font-size: 5rem;
             font-weight: bold;
-            color: #2c3e50;
-            margin: 10px 0;
+            color: #6e8efb;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
         }
         
         .confidence {
-            font-size: 1.2rem;
-            color: #7f8c8d;
+            margin-top: 15px;
+            font-size: 1.1rem;
+            color: #666;
         }
         
         .instructions {
-            background: #f8f9fa;
+            background: #e9ecef;
             padding: 15px;
             border-radius: 10px;
             margin-top: 20px;
             font-size: 0.9rem;
-            line-height: 1.5;
+            color: #495057;
         }
         
         .instructions h3 {
             margin-bottom: 10px;
-            color: #2c3e50;
+            color: #4a4a4a;
         }
         
         .instructions ul {
+            text-align: left;
             padding-left: 20px;
+            line-height: 1.6;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            color: white;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+        
+        .footer a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
         }
         
         /* スマホ用スタイル */
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.5rem;
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
             }
             
-            #canvas {
-                width: 280px;
-                height: 280px;
+            .container {
+                padding: 20px 15px;
+                border-radius: 15px;
             }
             
             button {
-                padding: 10px 15px;
-                min-width: 100px;
+                padding: 10px 20px;
                 font-size: 0.9rem;
+                min-width: 120px;
             }
             
-            .result {
-                font-size: 2rem;
+            #prediction {
+                font-size: 4rem;
             }
             
-            .confidence {
+            .description {
                 font-size: 1rem;
             }
-        }
-        
-        @media (max-width: 480px) {
-            h1 {
-                font-size: 1.3rem;
-            }
-            
-            #canvas {
-                width: 250px;
-                height: 250px;
-            }
-            
-            .button-group {
-                flex-direction: column;
-                align-items: center;
-            }
-            
-            button {
-                width: 100%;
-                max-width: 250px;
-            }
-            
-            .result {
-                font-size: 1.8rem;
-            }
-        }
-        
-        /* 描画インジケーター */
-        .drawing-indicator {
-            display: none;
-            margin-top: 10px;
-            font-style: italic;
-            color: #7f8c8d;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>手書き数字認識</h1>
+        <p class="description">キャンバスに数字を書いてください。AIが数字を認識します。</p>
         
         <div class="canvas-container">
             <canvas id="canvas" width="280" height="280"></canvas>
-            <p class="drawing-indicator" id="drawingIndicator">描画中...</p>
         </div>
         
-        <div class="button-group">
-            <button id="predictBtn">認識</button>
+        <div class="buttons">
+            <button id="predictBtn">認識する</button>
             <button id="clearBtn">クリア</button>
         </div>
         
-        <div class="result-container">
+        <div class="result">
             <h2>認識結果</h2>
-            <div class="result" id="result">-</div>
-            <div class="confidence" id="confidence">確信度: -</div>
+            <div id="prediction">-</div>
+            <div class="confidence">確信度: <span id="confidence">-</span></div>
         </div>
         
         <div class="instructions">
             <h3>使い方</h3>
             <ul>
-                <li>キャンバスに指またはマウスで数字を描いてください</li>
-                <li>「認識」ボタンを押すとAIが数字を推測します</li>
-                <li>「クリア」ボタンでキャンバスを消去できます</li>
-                <li>数字はできるだけ大きくはっきり描くほど精度が上がります</li>
+                <li>キャンバスに指やスタイラスで数字を書きます</li>
+                <li>[認識する]ボタンを押すとAIが数字を推測します</li>
+                <li>[クリア]ボタンでキャンバスを消去できます</li>
+                <li>スマホ、タブレット、PCのどれでもお使いいただけます</li>
             </ul>
         </div>
     </div>
+    
+    <div class="footer">
+        <p>Powered by TensorFlow.js | <a href="https://github.com/Michi-123/Hand_Written_number" target="_blank">GitHubリポジトリ</a></p>
+    </div>
 
     <script>
-        // キャンバスとコンテキストの設定
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const drawingIndicator = document.getElementById('drawingIndicator');
-        
-        // 描画状態の変数
-        let isDrawing = false;
-        let lastX = 0;
-        let lastY = 0;
-        
-        // キャンバスの初期化
-        function initCanvas() {
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        document.addEventListener('DOMContentLoaded', async () => {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const predictBtn = document.getElementById('predictBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const predictionElement = document.getElementById('prediction');
+            const confidenceElement = document.getElementById('confidence');
+            
+            // キャンバスの設定
+            let isDrawing = false;
             ctx.lineWidth = 15;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.strokeStyle = 'white';
-        }
-        
-        // 描画開始
-        function startDrawing(e) {
-            isDrawing = true;
-            drawingIndicator.style.display = 'block';
-            [lastX, lastY] = getPosition(e);
-        }
-        
-        // 描画中
-        function draw(e) {
-            if (!isDrawing) return;
-            e.preventDefault();
             
-            const [x, y] = getPosition(e);
-            
-            ctx.beginPath();
-            ctx.moveTo(lastX, lastY);
-            ctx.lineTo(x, y);
-            ctx.stroke();
-            
-            [lastX, lastY] = [x, y];
-        }
-        
-        // 描画終了
-        function stopDrawing() {
-            isDrawing = false;
-            drawingIndicator.style.display = 'none';
-        }
-        
-        // タッチ/マウス位置の取得
-        function getPosition(e) {
-            const rect = canvas.getBoundingClientRect();
-            let clientX, clientY;
-            
-            if (e.type.includes('touch')) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-            
-            return [
-                clientX - rect.left,
-                clientY - rect.top
-            ];
-        }
-        
-        // キャンバスクリア
-        function clearCanvas() {
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            document.getElementById('result').textContent = '-';
-            document.getElementById('confidence').textContent = '確信度: -';
-        }
-        
-        // 数字認識
-        async function predictDigit() {
-            // キャンバスから画像データを取得
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            
-            // 前処理: グレースケール化とリサイズ
-            const processed = preprocessImage(imageData);
-            
-            // モデルのロードと予測
+            // モデルの読み込み
+            let model;
             try {
-                const model = await tf.loadLayersModel('https://your-model-url/model.json');
-                const prediction = model.predict(processed);
-                const digit = prediction.argMax(1).dataSync()[0];
-                const confidence = prediction.max(1).dataSync()[0];
-                
-                // 結果表示
-                document.getElementById('result').textContent = digit;
-                document.getElementById('confidence').textContent = `確信度: ${(confidence * 100).toFixed(2)}%`;
-                
-                // メモリ解放
-                processed.dispose();
-                prediction.dispose();
+                const { createModel, MnistData } = mnist;
+                model = createModel();
+                const data = new MnistData();
+                await data.load();
+                await model.fit(data.getTrainData(), data.getTrainLabels(), {
+                    epochs: 20,
+                    validationData: [data.getTestData(), data.getTestLabels()],
+                    callbacks: {
+                        onEpochEnd: (epoch, logs) => {
+                            console.log(`Epoch ${epoch}: loss = ${logs.loss}, accuracy = ${logs.acc}`);
+                        }
+                    }
+                });
+                console.log('Model loaded successfully');
             } catch (error) {
-                console.error('モデルの読み込みに失敗しました:', error);
-                document.getElementById('result').textContent = 'エラー';
-                document.getElementById('confidence').textContent = 'モデルを読み込めません';
+                console.error('Error loading model:', error);
+                alert('モデルの読み込み中にエラーが発生しました。コンソールをご確認ください。');
             }
-        }
-        
-        // 画像前処理
-        function preprocessImage(imageData) {
-            return tf.tidy(() => {
-                // 画像データをテンソルに変換
-                let tensor = tf.browser.fromPixels(imageData, 1);
+            
+            // 描画機能（マウスとタッチの両方に対応）
+            function startDrawing(e) {
+                isDrawing = true;
+                draw(e);
+            }
+            
+            function stopDrawing() {
+                isDrawing = false;
+                ctx.beginPath();
+            }
+            
+            function draw(e) {
+                if (!isDrawing) return;
                 
-                // リサイズ
-                tensor = tf.image.resizeBilinear(tensor, [28, 28]);
+                // マウス/タッチの座標を取得
+                let clientX, clientY;
+                if (e.type.includes('touch')) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
                 
-                // 正規化
-                tensor = tensor.toFloat().div(255.0);
+                const rect = canvas.getBoundingClientRect();
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
                 
-                // バッチ次元を追加
-                return tensor.expandDims(0);
-            });
-        }
-        
-        // イベントリスナーの設定
-        function setupEventListeners() {
-            // マウスイベント
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+            }
+            
+            // イベントリスナーの設定
             canvas.addEventListener('mousedown', startDrawing);
             canvas.addEventListener('mousemove', draw);
             canvas.addEventListener('mouseup', stopDrawing);
             canvas.addEventListener('mouseout', stopDrawing);
             
             // タッチイベント
-            canvas.addEventListener('touchstart', startDrawing);
-            canvas.addEventListener('touchmove', draw);
-            canvas.addEventListener('touchend', stopDrawing);
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startDrawing(e);
+            });
             
-            // ボタンイベント
-            document.getElementById('predictBtn').addEventListener('click', predictDigit);
-            document.getElementById('clearBtn').addEventListener('click', clearCanvas);
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                draw(e);
+            });
             
-            // タッチデバイスでのスクロール防止
-            canvas.addEventListener('touchmove', function(e) {
-                if (isDrawing) {
-                    e.preventDefault();
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                stopDrawing();
+            });
+            
+            // キャンバスクリア
+            clearBtn.addEventListener('click', () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                predictionElement.textContent = '-';
+                confidenceElement.textContent = '-';
+            });
+            
+            // 予測機能
+            predictBtn.addEventListener('click', async () => {
+                if (!model) {
+                    alert('モデルが読み込まれていません。');
+                    return;
                 }
-            }, { passive: false });
-        }
-        
-        // 初期化
-        function init() {
-            initCanvas();
-            setupEventListeners();
-            
-            // タッチデバイス検出
-            if ('ontouchstart' in window) {
-                document.body.classList.add('touch-device');
-            }
-        }
-        
-        // アプリ起動
-        window.onload = init;
+                
+                // キャンバスのデータを取得
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // モデル入力用に前処理
+                let input = tf.browser.fromPixels(imageData, 1);
+                input = tf.image.resizeBilinear(input, [28, 28]);
+                input = input.toFloat().div(tf.scalar(255));
+                input = input.expandDims(0);
+                
+                // 予測
+                const prediction = model.predict(input);
+                const predictedDigit = prediction.argMax(1).dataSync()[0];
+                const confidence = prediction.max().dataSync()[0];
+                
+                // 結果を表示
+                predictionElement.textContent = predictedDigit;
+                confidenceElement.textContent = (confidence * 100).toFixed(2) + '%';
+                
+                // メモリ解放
+                input.dispose();
+                prediction.dispose();
+            });
+        });
     </script>
 </body>
 </html>
