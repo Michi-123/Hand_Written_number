@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手書き数字認識</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 20px auto;
+            border: 3px solid #667eea;
+            border-radius: 15px;
+            overflow: hidden;
+            background: #f8f9fa;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        #canvas {
+            display: block;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 80px;
+        }
+
+        .btn-clear {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-clear:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+        }
+
+        .btn-predict {
+            background: #4ecdc4;
+            color: white;
+        }
+
+        .btn-predict:hover {
+            background: #26a69a;
+            transform: translateY(-2px);
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .instructions {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .confidence-bars {
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        .confidence-bar {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .bar-label {
+            width: 20px;
+            font-weight: bold;
+        }
+
+        .bar-fill {
+            flex: 1;
+            height: 20px;
+            background: #e0e0e0;
+            margin: 0 10px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .bar-value {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.5s ease;
+        }
+
+        .bar-percent {
+            width: 40px;
+            text-align: right;
+            font-size: 10px;
+        }
+
+        /* モバイル対応 */
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            button {
+                padding: 10px 15px;
+                font-size: 12px;
+                min-width: 70px;
+            }
+            
+            .result {
+                font-size: 16px;
+                min-height: 50px;
+            }
+        }
+
+        /* タッチデバイス用の調整 */
+        @media (hover: none) {
+            button:hover {
+                transform: none;
+            }
+            
+            button:active {
+                transform: scale(0.95);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖊️ 手書き数字認識</h1>
+        
+        <div class="canvas-container">
+            <canvas id="canvas" width="280" height="280"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button class="btn-clear" onclick="clearCanvas()">クリア</button>
+            <button class="btn-predict" onclick="predictDigit()">認識</button>
+        </div>
+        
+        <div class="result" id="result">
+            数字を描いて「認識」ボタンを押してください
+        </div>
+        
+        <div class="confidence-bars" id="confidenceBars" style="display: none;">
+            <div style="text-align: center; margin-bottom: 10px; font-size: 14px; font-weight: bold;">信頼度</div>
+        </div>
+        
+        <div class="instructions">
+            💡 <strong>使い方:</strong><br>
+            キャンバスに0-9の数字を描いて、認識ボタンを押してください。<br>
+            スマホの場合は指で、PCの場合はマウスで描けます。
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        // キャンバスの初期設定
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 8;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // レスポンシブ対応：キャンバスサイズの調整
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const maxSize = Math.min(container.clientWidth - 6, 280);
+            canvas.style.width = maxSize + 'px';
+            canvas.style.height = maxSize + 'px';
+        }
+
+        // 座標の取得（マウスとタッチに対応）
+        function getEventPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            let clientX, clientY;
+            
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        // 描画開始
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            const pos = getEventPos(e);
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        // 描画中
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            
+            const pos = getEventPos(e);
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        // 描画終了
+        function stopDrawing(e) {
+            e.preventDefault();
+            isDrawing = false;
+        }
+
+        // マウスイベント
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        // タッチイベント
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing, { passive: false });
+        canvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+
+        // キャンバスクリア
+        function clearCanvas() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('result').textContent = '数字を描いて「認識」ボタンを押してください';
+            document.getElementById('confidenceBars').style.display = 'none';
+        }
+
+        // 数字認識のシミュレーション（実際のMLモデルに置き換え可能）
+        function predictDigit() {
+            // キャンバスが空でないかチェック
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const pixels = imageData.data;
+            let hasDrawing = false;
+            
+            for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i] < 255 || pixels[i + 1] < 255 || pixels[i + 2] < 255) {
+                    hasDrawing = true;
+                    break;
+                }
+            }
+            
+            if (!hasDrawing) {
+                document.getElementById('result').textContent = '数字を描いてから認識してください';
+                return;
+            }
+
+            // ローディング表示
+            document.getElementById('result').textContent = '認識中...';
+            
+            // シミュレーション：ランダムな予測結果
+            setTimeout(() => {
+                const predictions = [];
+                let maxProb = 0;
+                let predictedDigit = 0;
+                
+                for (let i = 0; i < 10; i++) {
+                    const prob = Math.random();
+                    predictions.push(prob);
+                    if (prob > maxProb) {
+                        maxProb = prob;
+                        predictedDigit = i;
+                    }
+                }
+                
+                // 最大値を1に正規化
+                const normalizedPredictions = predictions.map(p => p / maxProb);
+                
+                // 結果表示
+                document.getElementById('result').textContent = `認識結果: ${predictedDigit}`;
+                
+                // 信頼度バー表示
+                displayConfidenceBars(normalizedPredictions);
+                
+            }, 1000);
+        }
+
+        // 信頼度バーの表示
+        function displayConfidenceBars(predictions) {
+            const barsContainer = document.getElementById('confidenceBars');
+            barsContainer.innerHTML = '<div style="text-align: center; margin-bottom: 10px; font-size: 14px; font-weight: bold;">信頼度</div>';
+            
+            predictions.forEach((prob, digit) => {
+                const barDiv = document.createElement('div');
+                barDiv.className = 'confidence-bar';
+                
+                const percent = Math.round(prob * 100);
+                
+                barDiv.innerHTML = `
+                    <span class="bar-label">${digit}</span>
+                    <div class="bar-fill">
+                        <div class="bar-value" style="width: ${percent}%"></div>
+                    </div>
+                    <span class="bar-percent">${percent}%</span>
+                `;
+                
+                barsContainer.appendChild(barDiv);
+            });
+            
+            barsContainer.style.display = 'block';
+        }
+
+        // 初期化
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+    </script>
+</body>
+</html>
